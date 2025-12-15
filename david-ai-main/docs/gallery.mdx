@@ -1,0 +1,122 @@
+---
+title: Tailwind CSS Gallery - Components Library @David UI
+description: Showcase images beautifully with Tailwind CSS gallery components. Responsive layouts are perfect for portfolios, media-heavy pages, and more.
+github: Gallery
+prev: docs/react/inputs
+next: docs/react/Gallery-group
+---
+
+<ScriptLoader />
+
+<InfoBadge />
+
+# Tailwind CSS Image Gallery
+
+Showcase images effectively with the gallery component in David UI. Tailwind CSS styling supports grids, layouts, and responsiveness, making it ideal for portfolios or media-heavy pages.
+
+Explore our component examples to integrate stunning image displays with ease.
+
+
+---
+
+## Basic Gallery
+
+This example provides a clean and responsive image gallery arranged in a grid. It adapts seamlessly from a single column on small screens to multiple columns on larger screens. The images maintain a uniform size using the object-cover class, ensuring consistent proportions and a polished appearance.
+
+<PreviewWithCode relativePath="gallery/gallery-demo.tsx" language="html" />
+
+---
+
+## Masonry Grid Gallery
+
+For a more dynamic gallery, this example uses nested grids to create a visually compelling layout. The structure enhances the visual hierarchy, making it ideal for showcasing collections in a more engaging and storytelling-friendly format.
+
+<PreviewWithCode relativePath="gallery/masonry-grid-gallery.tsx" language="html" />
+
+<br />
+
+---
+
+## Featured Image Gallery
+
+Highlight a primary image with this gallery design, which pairs a prominent featured image with smaller thumbnail images below. This layout is perfect for product displays, portfolios, or galleries that emphasize a key visual element with selectable alternatives.
+
+<PreviewWithCode relativePath="gallery/featured-image-gallery.tsx" language="html" />
+
+---
+
+## Quad Gallery
+
+This gallery example features a horizontal scrolling format on smaller screens and a spacious layout on larger screens. Each image is styled to ensure clarity and adaptability.
+
+<PreviewWithCode relativePath="gallery/quad-gallery.tsx" language="html" />
+
+<br />
+
+---
+
+## Gallery With Tab
+
+Organize images into categories with this tabbed gallery. Users can toggle between tabs like "App," "Messages," and "Settings" to view different sets of images. This design is perfect for applications requiring a structured and user-friendly approach to presenting grouped visuals.
+
+<PreviewWithCode relativePath="gallery/gallery-with-tab.tsx" language="html" />
+
+--- 
+
+## Required Script
+
+The Gallery component in david-ai requires JavaScript to handle image switching and thumbnail interactions. The library provides smooth transitions and interactive behavior through data attributes.
+
+### Installation
+
+To use the Gallery component in your project, you first need to install the `david-ai` library via npm:
+
+<CodePreviewTailwindClasses codeSnippet={`npm install david-ai`}/>
+
+### Basic Usage
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { initGallery } from 'david-ai';
+
+// Initialize gallery functionality
+initGallery();
+`
+}/>
+
+### Using with Global Access
+If you prefer, you can use the DavidAI global object instead of directly importing initGallery:
+
+<CodePreviewTailwindClasses codeSnippet={
+`import * as DavidAI from 'david-ai';
+
+// Initialize gallery functionality
+DavidAI.initGallery();
+`
+}/>
+
+### Using with CDN
+You can include david-ai via a CDN and initialize gallery functionality globally in the browser. Add the following script to your HTML file:
+
+<CodePreviewTailwindClasses codeSnippet={`<script src="https://cdn.jsdelivr.net/gh/creativetimofficial/david-ai@1.0.6/packages/dist/david-ai.min.js" defer></script>`}/>
+
+### HTML Code Example
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div class="grid gap-4">
+    <div>
+      <img data-main-image class="h-auto w-full max-w-full rounded-lg object-cover object-center md:h-[480px]" src="path/to/main/image.jpg" alt="" />
+    </div>
+    <div class="grid grid-cols-5 gap-4">
+      <div>
+        <img data-thumbnail src="path/to/thumbnail1.jpg" class="object-cover object-center h-20 max-w-full rounded-lg cursor-pointer" alt="gallery-image" />
+      </div>
+      <div>
+        <img data-thumbnail src="path/to/thumbnail2.jpg" class="object-cover object-center h-20 max-w-full rounded-lg cursor-pointer" alt="gallery-image" />
+      </div>
+    </div>
+</div>`
+}/>
+
+### Gallery with tab
+
+The gallery with tabs component requires the same JavaScript from the Tabs component to function properly. Please refer to the [Tabs Component](david-ui/docs/html/tabs#required-script) documentation for the required initialization code.

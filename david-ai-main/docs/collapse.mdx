@@ -1,0 +1,228 @@
+---
+title: Tailwind CSS Collapse - Components Library @David UI
+description: Showcase collapsible sections with Tailwind CSS Collapse components. They are fully customizable for streamlined content organization and user-friendly designs.
+github: collapse
+---
+
+<ScriptLoader />
+
+<InfoBadge />
+
+# Tailwind CSS Collapse 
+
+David UI's Collapse component provides an elegant solution for organizing content in expandable sections. Styled with Tailwind CSS, it supports smooth transitions, icons, and fully customizable designs.
+
+Explore our responsive Collapse component examples, styled with Tailwind CSS, which are perfect for enhancing usability in your web or mobile projects.
+
+
+---
+
+## Basic Collapse
+
+This component is ideal for building features like accordions, mobile menus, file trees, and more. Copy and paste the code below directly into your project.
+
+<PreviewWithCode relativePath="collapse/collapse-demo.tsx" language="html" />
+
+--- 
+
+## Collapse List
+
+Check out this example to discover how to design a responsive collapse component tailored for various use cases.
+
+<PreviewWithCode relativePath="collapse/collapse-list.tsx" language="html" />
+
+---
+
+## Required Script
+
+The Collapse component in david-ai requires JavaScript to handle the expand/collapse functionality. The library provides smooth transitions and toggle behavior through data attributes.
+
+### Installation
+
+To use the Collapse component in your project, you first need to install the `david-ai` library via npm:
+
+<CodePreviewTailwindClasses codeSnippet={`npm install david-ai`}/>
+
+### Basic Usage
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { initCollapse } from 'david-ai';
+
+// Initialize collapse functionality
+initCollapse();
+`
+}/>
+
+### Using with Global Access
+If you prefer, you can use the DavidAI global object instead of directly importing initCollapse:
+
+<CodePreviewTailwindClasses codeSnippet={
+`import * as DavidAI from 'david-ai';
+
+// Initialize collapse functionality
+DavidAI.initCollapse();
+`
+}/>
+
+### Using with CDN
+You can include david-ai via a CDN and initialize collapse functionality globally in the browser. Add the following script to your HTML file:
+
+<CodePreviewTailwindClasses codeSnippet={`<script src="https://cdn.jsdelivr.net/gh/creativetimofficial/david-ai@1.0.6/packages/dist/david-ai.min.js" defer></script>`}/>
+
+### HTML Code Example
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div data-dui-toggle="collapse" 
+     data-dui-target="#collapseExample" 
+     aria-expanded="false" 
+     aria-controls="collapseExample"
+     class="cursor-pointer">
+  Toggle Collapse
+</div>
+<div class="overflow-hidden transition-[max-height] duration-300 ease-in-out max-h-0" 
+     id="collapseExample">
+  <div class="p-4">
+    Collapse content goes here
+  </div>
+</div>`
+}/>
+
+---
+
+## TypeScript
+
+David AI Collapse component can be used programmatically with TypeScript support for more control and type safety:
+
+### Programmatic Usage with TypeScript
+
+Learn how to use David AI's Collapse component with TypeScript for dynamic content toggling. This component provides programmatic methods to expand, collapse and animate content with full type safety and customization options.
+
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { Collapse } from "david-ai";
+import type { ICollapse, CollapseConfig } from "david-ai";
+
+// Define and initialize collapse configuration
+const config: CollapseConfig = {
+  iconSelector: "[data-dui-icon]",
+};
+
+let collapseInstance: ICollapse | null = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+  const buttonElement = document.querySelector<HTMLDivElement>(".button-element");
+  const collapseElement = document.querySelector<HTMLDivElement>(".collapse-element");
+
+  if (buttonElement && collapseElement) {
+    // Initialize the Collapse instance
+    collapseInstance = new Collapse(buttonElement, collapseElement, config);
+  }
+
+  // Add event listeners for toggle, expand, and collapse actions
+  const toggleButton = document.querySelector<HTMLButtonElement>(".toggle-button");
+  const expandButton = document.querySelector<HTMLButtonElement>(".expand-button");
+  const collapseButton = document.querySelector<HTMLButtonElement>(".collapse-button");
+
+  toggleButton?.addEventListener("click", () => collapseInstance?.toggle());
+  expandButton?.addEventListener("click", () => collapseInstance?.expand());
+  collapseButton?.addEventListener("click", () => collapseInstance?.collapse());
+});
+`
+}/>
+
+### HTML Structure
+
+The HTML structure demonstrates an accessible and interactive collapse component featuring:
+
+- A semantic button element for toggling content visibility
+- ARIA attributes for screen reader support
+- Smooth CSS transitions and animations
+- A rotating chevron icon indicating expanded/collapsed state
+- Dark and light theme compatibility with Tailwind CSS
+- Responsive navigation menu with hover states
+- Additional control buttons for programmatic interaction
+
+Here's the complete HTML implementation:
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div class="p-6 space-y-1">
+    <!-- Button to toggle collapse -->
+    <div
+      class="button-element flex items-center justify-between min-w-[15rem] cursor-pointer py-2 px-4 rounded-md transition duration-300 ease-in bg-white hover:bg-stone-100 dark:text-white dark:bg-stone-800 dark:hover:bg-stone-700">
+      Components
+      <span data-dui-icon class="grid place-items-center transition-transform transform duration-300">
+        <svg width="1.5em" height="1.5em" stroke-width="1.5" viewBox="0 0 24 24" fill="none"
+          xmlns="http://www.w3.org/2000/svg" color="currentColor" class="h-5 w-5 stroke-stone-700 dark:stroke-stone-300">
+          <path d="M6 9L12 15L18 9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"></path>
+        </svg>
+      </span>
+    </div>
+
+    <!-- Collapsible content -->
+    <div class="collapse-element overflow-hidden max-h-0 transition-all duration-300 ease-in-out">
+      <ul class="flex flex-col gap-1">
+        <li
+          class="py-2 px-4 rounded-md hover:bg-stone-800 cursor-pointer text-stone-900 dark:text-white">
+          Inbox
+        </li>
+        <li
+          class="py-2 px-4 rounded-md hover:bg-stone-800 cursor-pointer text-stone-900 dark:text-white">
+          Trash
+        </li>
+        <li
+          class="py-2 px-4 rounded-md hover:bg-stone-800 cursor-pointer text-stone-900 dark:text-white">
+          Settings
+        </li>
+      </ul>
+    </div>
+
+    <!-- Control buttons -->
+    <div class="flex space-x-2 pt-4">
+      <button class="toggle-button inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased">
+        Toggle
+      </button>
+      <button class="expand-button inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased">
+        Expand
+      </button>
+      <button class="collapse-button inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased">
+        Collapse
+      </button>
+    </div>
+  </div>`
+}/>
+
+
+
+---
+
+### Props & Methods
+The Collapse component provides a way to toggle the visibility of content with smooth animations and accessibility features. It supports icon rotation and programmatic control through methods like toggle, expand, and collapse.
+
+<br></br>
+
+<TsPropsTable data={[
+  {
+    interface: "CollapseConfig",
+    property: "iconSelector",
+    type: "string (optional)",
+    description: "Selector for the icon element to toggle rotation. For example, you can pass \"[data-icon]\" to target specific icons."
+  },
+  {
+    interface: "ICollapse", 
+    property: "toggle()",
+    type: "void",
+    description: "Toggles the collapsible content visibility."
+  },
+  {
+    interface: "ICollapse",
+    property: "expand()",
+    type: "void", 
+    description: "Expands the collapsible content."
+  },
+  {
+    interface: "ICollapse",
+    property: "collapse()",
+    type: "void",
+    description: "Collapses the collapsible content."
+  }
+]} />

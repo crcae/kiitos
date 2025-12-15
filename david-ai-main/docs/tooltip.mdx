@@ -1,0 +1,230 @@
+---
+title: Tailwind CSS Tooltip - Components Library @David UI
+description: Create interactive tooltips with Tailwind CSS in David UI. Explore a variety of tooltip examples with complete code snippets for free.
+github: tooltip
+---
+
+<ScriptLoader />
+
+<InfoBadge />
+
+# Tailwind CSS Tooltip
+
+David UI's Tooltip component offers an intuitive way to display contextual hints or information. Styled with Tailwind CSS, it supports customizable triggers, smooth animations, and flexible layouts for an enhanced user experience.
+
+Explore our responsive Tooltip component examples, styled with Tailwind CSS, perfect for improving usability in your web or mobile projects.
+
+---
+
+## Basic Tooltip
+
+A simple Tooltip component that appears when hovering over a button. This example demonstrates how to use tooltips for providing quick, context-sensitive information without cluttering the interface.
+
+<PreviewWithCode relativePath="tooltip/tooltip-demo.tsx" language="html" />
+
+---
+
+## Tooltip Placement
+
+Showcases the flexibility of the Tooltip component with various placement options, including top, right, bottom, and left. These placements ensure the tooltip adapts seamlessly to different layouts and user interactions.
+
+<PreviewWithCode relativePath="tooltip/tooltip-placement.tsx" language="html" />
+
+---
+
+## Tooltip with Helper Icon
+
+A Tooltip example featuring a helper icon that triggers the tooltip. Perfect for displaying additional information or guidance in a clean and intuitive way, such as explaining form fields or settings.
+
+
+<PreviewWithCode relativePath="tooltip/tooltip-with-helper-icon.tsx" language="html" />
+
+---
+
+## Tooltip Custom Styles
+
+An example of a Tooltip with custom styles, including borders, background colors, and typography. This demonstrates how to customize tooltips to align with your application's design system or branding.
+
+<PreviewWithCode relativePath="tooltip/tooltip-custom-styles.tsx" language="html" />
+
+--- 
+
+## Required Script
+
+The Tooltip component in david-ai requires JavaScript to handle the tooltip functionality and positioning. The library provides smooth transitions and hover behavior through data attributes, powered by Popper.js for accurate positioning.
+
+### Installation
+
+To use the Tooltip component in your project, you first need to install the `david-ai` library via npm:
+
+<CodePreviewTailwindClasses codeSnippet={`npm install david-ai`}/>
+
+### Basic Usage
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { initTooltips } from 'david-ai';
+
+// Initialize tooltip functionality
+initTooltips();
+`
+}/>
+
+### Using with Global Access
+If you prefer, you can use the DavidAI global object instead of directly importing initTooltips:
+
+<CodePreviewTailwindClasses codeSnippet={
+`import * as DavidAI from 'david-ai';
+
+// Initialize tooltip functionality
+DavidAI.initTooltips();
+`
+}/>
+
+### Using with CDN
+You can include david-ai via a CDN and initialize tooltip functionality globally in the browser. Add the following script to your HTML file:
+
+<CodePreviewTailwindClasses codeSnippet={`<script src="https://cdn.jsdelivr.net/gh/creativetimofficial/david-ai@1.0.6/packages/dist/david-ai.min.js" defer></script>`}/>
+
+### HTML Code Example
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div class="flex justify-center">
+  <button type="button" 
+          data-dui-toggle="tooltip" 
+          data-dui-placement="top"
+          data-dui-title="Tooltip Title"
+          data-dui-tooltip-class="bg-stone-800 text-white text-xs rounded-md py-1 px-2 shadow-md z-50"
+          class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased">
+    Hover me
+  </button>
+</div>`
+}/>
+
+---
+
+## TypeScript
+
+David AI Tooltip component can be used programmatically with TypeScript support for more control and type safety:
+
+### Programmatic Usage with TypeScript
+
+Learn how to use David AI's Tooltip component with TypeScript for enhanced tooltip control. This component provides programmatic methods to show/hide tooltips, customize content and placement, and configure tooltip behavior with full type safety and customization options.
+
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { Tooltip } from "david-ai";
+  import type { TooltipConfig, ITooltip } from "david-ai";
+
+  document.addEventListener("DOMContentLoaded", () => {
+  // Trigger elements
+  const button: HTMLElement | null = document.getElementById("tooltip-button");
+  const showButton: HTMLElement | null = document.getElementById("show-tooltip");
+  const hideButton: HTMLElement | null = document.getElementById("hide-tooltip");
+
+  if (!button || !showButton || !hideButton) {
+    console.error("Tooltip trigger elements or control buttons not found.");
+    return;
+  }
+
+  // Initialize tooltip config
+  const tooltipConfig: TooltipConfig = {
+    content: "This is a tooltip for the button.",
+    placement: "bottom", 
+    tooltipClass: "bg-stone-800 text-white text-xs rounded-md py-1 px-2 shadow-md z-50",
+  };
+
+  const tooltip: ITooltip = new Tooltip(button, tooltipConfig);
+
+  // Example programmatic control
+  button.addEventListener("click", async () => {
+    await tooltip.showTooltip(); // Programmatically show the tooltip
+    setTimeout(() => tooltip.hideTooltip(), 2000); // Auto-hide after 2 seconds
+  });
+
+  // External control buttons
+  showButton.addEventListener("click", () => {
+    tooltip.showTooltip();
+  });
+
+  hideButton.addEventListener("click", () => {
+    tooltip.hideTooltip();
+  });
+});`
+}/>
+
+### HTML Structure
+
+The HTML structure demonstrates an accessible and interactive tooltip component featuring:
+
+- Trigger element that shows/hides tooltip on hover/click
+- Customizable tooltip content and placement
+- ARIA attributes for accessibility support 
+- Dynamic positioning that follows trigger element
+- Smooth show/hide transitions
+- Dark and light theme compatibility with Tailwind CSS
+- Responsive design that adapts to screen edges
+- Data attributes for configuration
+- Customizable styling through Tailwind classes
+- Programmatic control through JavaScript methods
+
+Here's the complete HTML implementation:
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div class="flex flex-col items-center gap-4 mt-8">
+    <!-- Tooltip Trigger Elements -->
+    <button id="tooltip-button" class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased">
+      Hover over me
+    </button>
+
+    <!-- External Control Buttons -->
+    <div class="flex gap-4 mt-4">
+      <button id="show-tooltip" class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased">
+        Show Tooltip
+      </button>
+      <button id="hide-tooltip" class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased">
+        Hide Tooltip
+      </button>
+    </div>
+  </div>`
+}/>
+
+---
+
+### Props & Methods
+The Tooltip component provides a way to display contextual information when users hover over or interact with an element. It supports customizable positioning, styling, and programmatic control through methods to show and hide the tooltip.
+
+<br></br>
+
+<TsPropsTable data={[
+  {
+    interface: "TooltipConfig",
+    property: "placement",
+    type: "Placement", 
+    description: "The placement of the tooltip relative to the trigger element (e.g. 'top', 'bottom', 'left', 'right')."
+  },
+  {
+    interface: "TooltipConfig",
+    property: "tooltipClass",
+    type: "string",
+    description: "CSS classes to apply to the tooltip element for styling."
+  },
+  {
+    interface: "TooltipConfig",
+    property: "content",
+    type: "string | HTMLElement",
+    description: "The content to display inside the tooltip. Can be a string or HTML element."
+  },
+  {
+    interface: "ITooltip",
+    property: "showTooltip()",
+    type: "Promise<void>",
+    description: "Shows the tooltip. Returns a promise that resolves once the tooltip is displayed."
+  },
+  {
+    interface: "ITooltip", 
+    property: "hideTooltip()",
+    type: "void",
+    description: "Hides the tooltip."
+  }
+]} />
+

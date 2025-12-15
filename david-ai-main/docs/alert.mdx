@@ -1,0 +1,143 @@
+---
+title: Tailwind CSS Alert - Components Library @David UI
+description: Explore Tailwind CSS alert components at David UI. Build notifications for success, error, or warnings with accessible, responsive, and stylish designs.
+github: Alert
+prev: docs/react/inputs
+next: docs/react/Alert-group
+---
+
+<ScriptLoader />
+
+<InfoBadge />
+
+# Tailwind CSS Alerts
+
+David UI’s alert component is ideal for displaying messages like success, error, or warnings. 
+
+Built with Tailwind CSS and HTML, it ensures accessibility and supports various styles and colors. Its responsive design fits seamlessly into any interface. 
+
+Check out David UI's alert examples to add impactful notifications to your Tailwind CSS applications.
+
+
+---
+
+## Basic Alert
+
+This example showcases an alert with white text on a dark gray background, offering strong contrast for improved readability.
+
+<PreviewWithCode relativePath="alert/alert-demo.tsx" language="html" />
+
+---
+
+## Alert Variants
+
+This set showcases four alert variants: Ghost (subtle, semi-transparent background), Outline (transparent with a defined border), Solid (bold, solid background), and Gradient (vibrant gradient effect). Each variant is visually distinct, responsive, and adaptable to various UI needs.
+
+<PreviewWithCode relativePath="alert/alert-variants.tsx" language="html" />
+
+---
+
+## Alert Colors
+
+Choose from 19 color options for the Alert component by applying specific color classes. The example below showcases a selection of available colors.
+
+<PreviewWithCode relativePath="alert/alert-colors.tsx" language="html" />
+
+---
+
+## Alert Icon
+
+Optimize your Tailwind CSS alert with an icon at the beginning by incorporating the `i` tag for a visually enriched component.
+
+<PreviewWithCode relativePath="alert/alert-icon.tsx" language="html" />
+
+---
+
+## Alert with List
+
+The Alert component supports a variety of embedded elements. The example below illustrates an alert containing a list.
+
+<PreviewWithCode relativePath="alert/alert-with-list.tsx" language="html" />
+
+---
+
+## Alert Dismissible
+This example includes a dismiss button on the right with an intuitive "close" icon, allowing users to easily remove the alert.
+
+<PreviewWithCode relativePath="alert/alert-dismissible.tsx" language="html" />
+
+---
+
+## Alert Custom Close Icon
+
+Replace the default close icon with any DOM element to customize the appearance of the Alert component's dismiss feature.
+
+<PreviewWithCode relativePath="alert/alert-custom-close-icon.tsx" language="html" />
+
+---
+
+## Alert with Content
+
+Combine elements such as titles and descriptions within the Alert component to create more comprehensive and informative alerts.
+
+<PreviewWithCode relativePath="alert/alert-with-content.tsx" language="html" />
+
+
+---
+
+## Alert Custom Styles
+
+Here is an example of how you can implement unique styles for the Alert component.
+
+<PreviewWithCode relativePath="alert/alert-custom-styles.tsx" language="html" />
+
+---
+
+## Required Script
+
+The Alert component in david-ai is only dependent on JavaScript if you are using dismissible alerts. This means if your alert includes a dismiss button with `data-dui-dismiss="alert"`, the library's JavaScript is required to enable the functionality for closing the alert. 
+
+### Installation
+
+To use the Alert component in your project, you first need to install the `david-ai` library via npm:
+
+<CodePreviewTailwindClasses codeSnippet={`npm install david-ai`}/>
+
+
+### Basic Usage
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { initAlert } from 'david-ai';
+
+// Initialize alerts
+initAlert();
+`
+}/>
+
+### Using with Global Access
+If you prefer, you can use the DavidAI global object instead of directly importing initAlert:
+
+<CodePreviewTailwindClasses codeSnippet={
+`import * as DavidAI from 'david-ai';
+
+// Initialize alerts 
+DavidAI.initAlert();
+`
+}/>
+
+### Using with CDN
+You can include david-ai via a CDN and initialize alerts globally in the browser. Add the following script to your HTML file:
+
+<CodePreviewTailwindClasses codeSnippet={`<script src="https://cdn.jsdelivr.net/gh/creativetimofficial/david-ai@1.0.6/packages/dist/david-ai.min.js" defer></script>`}/>
+
+### HTML Code Example
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div role="alert" class="relative flex items-start w-full border rounded-md p-2 bg-stone-800 border-stone-800 text-stone-50">
+    <div class="w-full text-sm font-sans leading-none m-1.5">A simple alert for showing message</div>
+    <button data-dui-dismiss="alert" class="outline-none">x</button>
+</div>
+`
+}/>
+
+

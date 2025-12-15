@@ -1,101 +1,238 @@
-import { useState } from 'react';
-import { View, Text, Alert } from 'react-native';
-import { useRouter, Link } from 'expo-router';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import React, { useState } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    KeyboardAvoidingView,
+    ScrollView,
+    Platform,
+    Alert,
+} from 'react-native';
+import { Link, useRouter } from 'expo-router';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth, db } from '../services/firebaseConfig';
-import Button from '../components/Button';
-import Input from '../components/Input';
+import { doc, setDoc } from 'firebase/firestore';
+import AirbnbButton from '../components/AirbnbButton';
+import AirbnbInput from '../components/AirbnbInput';
+import { colors, spacing, typography } from '../styles/theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function SignUpScreen() {
     const router = useRouter();
+    const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
-    const [name, setName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState({ name: '', email: '', password: '' });
 
     const handleSignUp = async () => {
-        if (!email || !password || !name) {
-            Alert.alert('Error', 'Por favor completa todos los campos');
+        // Reset errors
+        setErrors({ name: '', email: '', password: '' });
+
+        // Validate
+        if (!name) {
+            setErrors(prev => ({ ...prev, name: 'El nombre es requerido' }));
             return;
         }
+        if (!email) {
+            setErrors(prev => ({ ...prev, email: 'El correo es requerido' }));
+            return;
+        }
+        if (!password || password.length < 6) {
+            setErrors(prev => ({
+                ...prev,
+                password: 'La contraseña debe tener al menos 6 caracteres',
+            }));
+            return;
+        }
+
         setLoading(true);
         try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-            const user = userCredential.user;
+            const userCredential = await createUserWithEmailAndPassword(
+                auth,
+                email,
+                password
+            );
 
-            // Create user profile in Firestore
-            await setDoc(doc(db, 'profiles', user.uid), {
-                email: user.email,
+            // Update profile with name
+            await updateProfile(userCredential.user, {
                 displayName: name,
+            });
+
+            // Create user document in Firestore
+            await setDoc(doc(db, 'users', userCredential.user.uid), {
+                name,
+                email,
                 createdAt: new Date().toISOString(),
             });
 
             router.replace('/');
         } catch (error: any) {
-            Alert.alert('Error al registrarse', error.message);
+            Alert.alert(
+                'Error',
+                error.code === 'auth/email-already-in-use'
+                    ? 'Este correo ya está registrado'
+                    : 'Error al crear la cuenta'
+            );
         } finally {
             setLoading(false);
         }
     };
 
-    const handleGoogleLogin = () => {
-        Alert.alert('Info', 'Google Sign-In requiere configuración adicional');
+    const handleGoogleSignUp = () => {
+        Alert.alert(
+            'Próximamente',
+            'Registro con Google estará disponible pronto'
+        );
     };
 
     return (
-        <View className="flex-1 bg-white p-6 justify-center">
-            <View className="items-center mb-10">
-                <Text className="text-3xl font-bold text-rose-500 mb-2">Crear Cuenta</Text>
-                <Text className="text-lg text-gray-600">Únete a Kiitos</Text>
-            </View>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+            <KeyboardAvoidingView
+                style={styles.keyboardView}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={styles.content}>
+                        {/* Header */}
+                        <View style={styles.header}>
+                            <Text style={styles.title}>Crea tu cuenta</Text>
+                            <Text style={styles.subtitle}>Únete y comienza a dividir cuentas</Text>
+                        </View>
 
-            <Input
-                label="Nombre Completo"
-                value={name}
-                onChangeText={setName}
-                placeholder="Juan Pérez"
-            />
-            <Input
-                label="Correo Electrónico"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="ejemplo@correo.com"
-                keyboardType="email-address"
-            />
-            <Input
-                label="Contraseña"
-                value={password}
-                onChangeText={setPassword}
-                placeholder="********"
-                secureTextEntry
-            />
+                        {/* Form */}
+                        <View style={styles.form}>
+                            <AirbnbInput
+                                label="Nombre Completo"
+                                value={name}
+                                onChangeText={setName}
+                                autoCapitalize="words"
+                                autoComplete="name"
+                                placeholder="Tu nombre"
+                                error={errors.name}
+                            />
 
-            <Button
-                title="Registrarse"
-                onPress={handleSignUp}
-                loading={loading}
-                className="mt-4"
-            />
+                            <AirbnbInput
+                                label="Correo Electrónico"
+                                value={email}
+                                onChangeText={setEmail}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                autoComplete="email"
+                                placeholder="ejemplo@correo.com"
+                                error={errors.email}
+                            />
 
-            <View className="my-6 flex-row items-center">
-                <View className="flex-1 h-px bg-gray-200" />
-                <Text className="mx-4 text-gray-400">O</Text>
-                <View className="flex-1 h-px bg-gray-200" />
-            </View>
+                            <AirbnbInput
+                                label="Contraseña"
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry
+                                autoComplete="password-new"
+                                placeholder="Mínimo 6 caracteres"
+                                error={errors.password}
+                            />
 
-            <Button
-                title="Registrarse con Google"
-                onPress={handleGoogleLogin}
-                variant="google"
-            />
+                            <AirbnbButton
+                                title="Registrarse"
+                                onPress={handleSignUp}
+                                loading={loading}
+                                variant="primary"
+                            />
+                        </View>
 
-            <View className="flex-row justify-center mt-8">
-                <Text className="text-gray-600">¿Ya tienes cuenta? </Text>
-                <Link href="/login" asChild>
-                    <Text className="text-rose-500 font-bold">Inicia Sesión</Text>
-                </Link>
-            </View>
-        </View>
+                        {/* Divider */}
+                        <View style={styles.dividerContainer}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>O</Text>
+                            <View style={styles.dividerLine} />
+                        </View>
+
+                        {/* Google Sign-Up */}
+                        <AirbnbButton
+                            title="Registrarse con Google"
+                            onPress={handleGoogleSignUp}
+                            variant="google"
+                            icon="logo-google"
+                        />
+
+                        {/* Login Link */}
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>¿Ya tienes cuenta? </Text>
+                            <Link href="/login" asChild>
+                                <Text style={styles.footerLink}>Inicia Sesión</Text>
+                            </Link>
+                        </View>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: colors.white,
+    },
+    keyboardView: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        justifyContent: 'center',
+    },
+    content: {
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.xxxl,
+    },
+    header: {
+        marginBottom: spacing.xxxl,
+    },
+    title: {
+        fontSize: typography.xxxxl,
+        fontWeight: typography.bold,
+        color: colors.darkText,
+        marginBottom: spacing.sm,
+    },
+    subtitle: {
+        fontSize: typography.lg,
+        color: colors.darkGray,
+    },
+    form: {
+        marginBottom: spacing.xl,
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: spacing.xl,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: colors.lightGray,
+    },
+    dividerText: {
+        marginHorizontal: spacing.lg,
+        fontSize: typography.sm,
+        color: colors.gray,
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: spacing.xl,
+    },
+    footerText: {
+        fontSize: typography.base,
+        color: colors.gray,
+    },
+    footerLink: {
+        fontSize: typography.base,
+        color: colors.airbnbPink,
+        fontWeight: typography.semibold,
+    },
+});

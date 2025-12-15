@@ -1,17 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { auth } from '../src/services/firebaseConfig';
 import { BillProvider } from '../src/context/BillContext';
+import { GuestProvider } from '../src/context/GuestContext';
+import { AuthProvider } from '../src/context/AuthContext';
+import { TenantProvider } from '../src/context/TenantContext';
 import '../global.css';
 
 export default function Layout() {
     const [user, setUser] = useState<User | null | undefined>(undefined);
     const [initializing, setInitializing] = useState(true);
-    const router = useRouter();
-    const segments = useSegments();
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -21,32 +23,38 @@ export default function Layout() {
         return unsubscribe;
     }, []);
 
-    useEffect(() => {
-        if (initializing) return;
-
-        const inAuthGroup = segments[0] === 'login' || segments[0] === 'sign-up';
-
-        if (!user && !inAuthGroup) {
-            // Redirect to login if not authenticated
-            router.replace('/login');
-        } else if (user && inAuthGroup) {
-            // Redirect to home if authenticated
-            router.replace('/');
-        }
-    }, [user, initializing, segments]);
-
     if (initializing) {
         return (
-            <View className="flex-1 items-center justify-center bg-white">
-                <ActivityIndicator size="large" color="#F43F5E" />
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#FF385C" />
             </View>
         );
     }
 
     return (
-        <BillProvider>
-            <Stack screenOptions={{ headerShown: false }} />
-            <StatusBar style="auto" />
-        </BillProvider>
+        <GestureHandlerRootView style={styles.container}>
+            <AuthProvider>
+                <TenantProvider>
+                    <GuestProvider>
+                        <BillProvider>
+                            <Stack screenOptions={{ headerShown: false }} />
+                            <StatusBar style="auto" />
+                        </BillProvider>
+                    </GuestProvider>
+                </TenantProvider>
+            </AuthProvider>
+        </GestureHandlerRootView>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+    },
+    loadingContainer: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#FFFFFF',
+    },
+});

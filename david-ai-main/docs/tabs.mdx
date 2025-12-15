@@ -1,0 +1,277 @@
+---
+title: Tailwind CSS Tabs - Components Library @David UI
+description: Implement tabs with Tailwind CSS using the David UI framework. Check our examples that provide a dynamic and organized way to display content in switchable sections.
+github: tabs
+---
+
+<ScriptLoader />
+
+<InfoBadge />
+
+# Tailwind CSS Tabs
+
+David UI's Tabs component provides a dynamic and organized way to display content in switchable sections. Styled with Tailwind CSS, it supports customizable designs, smooth transitions, and responsive layouts for seamless navigation.
+
+Explore our responsive Tabs component examples, styled with Tailwind CSS, perfect for enhancing user engagement in your web or mobile projects.
+
+---
+
+## Basic Tabs
+
+Try this straightforward implementation of the Tabs component featuring multiple tab options. Each tab displays distinct content, making it ideal for organizing and switching between different sections of a page or application.
+
+<PreviewWithCode relativePath="tabs/tabs-demo.tsx" language="html" />
+
+---
+
+## Tabs with Icon
+
+An enhanced version of the Tabs component that incorporates icons for each tab. Perfect for creating visually appealing and intuitive navigation.
+
+<PreviewWithCode relativePath="tabs/tabs-with-icon.tsx" language="html" />
+
+---
+
+## Vertical Tabs
+
+Use this example of a Tabs component with a vertical orientation. This layout is ideal for side navigation, allowing for clear separation of content while maintaining a structured and responsive design.
+
+<PreviewWithCode relativePath="tabs/vertical-tabs.tsx" language="html" />
+
+---
+
+## Vertical Tabs with Icon
+
+A vertical version of the Tabs component that includes icons alongside the tab labels. This setup is excellent for dashboards and side navigation menus, combining visual cues with usability.
+
+<PreviewWithCode relativePath="tabs/vertical-tabs-with-icon.tsx" language="html" />
+
+---
+
+## Transparent Tabs
+
+A stylish implementation of the Tabs component with a transparent background. This design is ideal for blending seamlessly into minimalist or clean interfaces, offering smooth transitions and a light visual touch.
+
+<PreviewWithCode relativePath="tabs/transparent-tabs.tsx" language="html" />
+
+---
+
+## Underline Tabs
+
+This variation of the Tabs component features an underlined indicator for the active tab. This design provides a clear, elegant, and modern visual cue to indicate the selected tab, making it a great fit for streamlined navigation menus.
+
+<PreviewWithCode relativePath="tabs/underline-tabs.tsx" language="html" />
+
+---
+
+## Underline Vertical Tabs
+
+Use this example to build a Tabs component with underline triggers and a subtle colored indicator, perfect for displaying tabs on a white or light-colored background.
+
+<PreviewWithCode relativePath="tabs/underline-vertical-tabs.tsx" language="html" />
+
+---
+
+## Required Script
+
+The Tabs component in david-ai requires JavaScript to handle tab switching and content display. The library provides smooth transitions and interactive behavior through data attributes.
+
+### Installation
+
+To use the Tabs component in your project, you first need to install the `david-ai` library via npm:
+
+<CodePreviewTailwindClasses codeSnippet={`npm install david-ai`}/>
+
+### Basic Usage
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { initTabs } from 'david-ai';
+
+// Initialize tabs functionality
+initTabs();
+`
+}/>
+
+### Using with Global Access
+If you prefer, you can use the DavidAI global object instead of directly importing initTabs:
+
+<CodePreviewTailwindClasses codeSnippet={
+`import * as DavidAI from 'david-ai';
+
+// Initialize tabs functionality
+DavidAI.initTabs();
+`
+}/>
+
+### Using with CDN
+You can include david-ai via a CDN and initialize tabs functionality globally in the browser. Add the following script to your HTML file:
+
+<CodePreviewTailwindClasses codeSnippet={`<script src="https://cdn.jsdelivr.net/gh/creativetimofficial/david-ai@1.0.6/packages/dist/david-ai.min.js" defer></script>`}/>
+
+### HTML Code Example
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div class="relative tab-group">
+    <div class="flex bg-stone-100 p-0.5 relative rounded-lg" role="tablist">
+        <div class="absolute top-1 left-0.5 h-8 bg-white rounded-md shadow-sm transition-all duration-300 transform scale-x-0 translate-x-0 tab-indicator z-0"></div>
+
+        <a href="#" class="tab-link text-sm active inline-block py-2 px-4 text-stone-800 transition-all duration-300 relative z-1 mr-1" data-dui-tab-target="tab-1">
+          Tab 1
+        </a>
+        <a href="#" class="tab-link text-sm inline-block py-2 px-4 text-stone-800 transition-all duration-300 relative z-1 mr-1" data-dui-tab-target="tab-2">
+          Tab 2
+        </a>
+    </div>
+    <div class="mt-4 tab-content-container">
+        <div id="tab-1" class="tab-content text-stone-500 text-sm block">
+          <p>Content for Tab 1.</p>
+        </div>
+        <div id="tab-2" class="tab-content text-stone-500 text-sm hidden">
+          <p>Content for Tab 2.</p>
+        </div>
+    </div>
+</div>`
+}/>
+
+
+---
+
+## TypeScript
+
+David AI Tabs component can be used programmatically with TypeScript support for more control and type safety:
+
+### Programmatic Usage with TypeScript
+
+Learn how to use David AI's Tabs component with TypeScript for dynamic tab navigation. This component provides programmatic methods to switch between tabs, track active states, and configure tab behavior with full type safety and customization options. The TypeScript integration enables robust tab management with features like animated indicators, keyboard navigation, and flexible orientation settings.
+
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { Tabs } from "david-ai";
+  import type { TabsConfig, ITabs } from "david-ai";
+
+  document.addEventListener("DOMContentLoaded", () => {
+  const tabGroup = document.getElementById("tab-group");
+
+  if (!tabGroup) {
+    console.error("Tab group element not found.");
+    return;
+  }
+
+  // Initialize the Tabs with config
+  const config: TabsConfig = {
+    orientation: "horizontal",
+    defaultTabId: "tab4"
+  };
+
+  // Create tabs instance with type
+  const tabs: ITabs = new Tabs(tabGroup, config);
+
+  // Clean up tabs when needed
+  window.addEventListener("beforeunload", () => {
+    tabs.cleanup();
+  });
+});`
+}/>
+
+### HTML Structure
+
+The HTML structure demonstrates an accessible and interactive tabs component featuring:
+
+- Tab links that act as navigation controls
+- Sliding indicator that highlights the active tab
+- ARIA attributes for accessibility support 
+- Content panels that show/hide dynamically
+- Smooth transitions between tab states
+- Dark and light theme compatibility with Tailwind CSS
+- Responsive design that adapts to different screen sizes
+- Proper semantic HTML structure with role="tablist"
+- Customizable styling through Tailwind classes
+- Programmatic control through JavaScript methods
+
+Here's the complete HTML implementation:
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div id="tab-group" class="relative tab-group">
+    <!-- Tab Links -->
+    <div id="tab-list" class="flex bg-stone-100 p-0.5 relative rounded-lg" role="tablist">
+      <div id="tab-indicator"
+        class="absolute top-1 left-0.5 h-8 bg-white rounded-md shadow-sm transition-all duration-300 transform scale-x-0 translate-x-0 tab-indicator z-0">
+      </div>
+  
+      <a href="#" id="tab1"
+        class="tab-link text-sm active inline-block py-2 px-4 text-stone-800 transition-all duration-300 relative z-1 mr-1">
+        HTML
+      </a>
+      <a href="#" id="tab2"
+        class="tab-link text-sm inline-block py-2 px-4 text-stone-800 transition-all duration-300 relative z-1 mr-1">
+        React
+      </a>
+      <a href="#" id="tab3"
+        class="tab-link text-sm inline-block py-2 px-4 text-stone-800 transition-all duration-300 relative z-1 mr-1">
+        Vue
+      </a>
+      <a href="#" id="tab4"
+        class="tab-link text-sm inline-block py-2 px-4 text-stone-800 transition-all duration-300 relative z-1 mr-1">
+        Angular
+      </a>
+      <a href="#" id="tab5"
+        class="tab-link text-sm inline-block py-2 px-4 text-stone-800 transition-all duration-300 relative z-1 mr-1">
+        Svelte
+      </a>
+    </div>
+  
+    <!-- Tab Content -->
+    <div id="tab-content-container" class="mt-4 tab-content-container">
+      <div id="tab1-content" class="tab-content text-stone-500 text-sm block">
+        <p>Content for HTML.</p>
+      </div>
+      <div id="tab2-content" class="tab-content text-stone-500 text-sm hidden">
+        <p>Content for React.</p>
+      </div>
+      <div id="tab3-content" class="tab-content text-stone-500 text-sm hidden">
+        <p>Content for Vue.</p>
+      </div>
+      <div id="tab4-content" class="tab-content text-stone-500 text-sm hidden">
+        <p>Content for Angular.</p>
+      </div>
+      <div id="tab5-content" class="tab-content text-stone-500 text-sm hidden">
+        <p>Content for Svelte.</p>
+      </div>
+    </div>
+  </div>`
+}/>
+
+---
+
+### Props & Methods
+The Tabs component provides a flexible way to organize content into tabbed sections. It supports customizable tab indicators, content panels, and programmatic control through methods like tab activation. The component includes smooth animations and keyboard navigation for enhanced user experience.
+
+<br></br>
+
+<TsPropsTable data={[
+  {
+    interface: "TabsConfig",
+    property: "orientation",
+    type: "'horizontal' | 'vertical'",
+    description: "Sets the orientation of the tabs. Defaults to 'horizontal'."
+  },
+  {
+    interface: "TabsConfig",
+    property: "defaultTabId",
+    type: "string",
+    description: "ID of the tab to be active by default. If not provided, first tab will be active."
+  },
+  {
+    interface: "ITabs",
+    property: "activateTab(tabId: string)",
+    type: "void", 
+    description: "Activates the tab with the specified ID."
+  },
+  {
+    interface: "ITabs",
+    property: "cleanup()",
+    type: "void",
+    description: "Cleans up the tab group by removing event listeners and resetting the DOM."
+  },
+]} />
+

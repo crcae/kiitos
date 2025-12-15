@@ -1,0 +1,239 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HELPER FUNCTIONS
+    // ============================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function getRestaurantId() {
+      // In production, this should come from custom claims
+      // For development, we'll read from the user document
+      return request.auth.token.restaurantId;
+    }
+    
+    function getUserRole() {
+      // In production, this should come from custom claims
+      // For development, we'll read from the user document
+      return request.auth.token.role;
+    }
+    
+    function isSaaSAdmin() {
+      return getUserRole() == 'saas_admin';
+    }
+    
+    function isRestaurantOwner() {
+      return getUserRole() == 'restaurant_owner';
+    }
+    
+    function isRestaurantManager() {
+      return getUserRole() == 'restaurant_manager';
+    }
+    
+    function hasManagementAccess() {
+      return isRestaurantOwner() || isRestaurantManager();
+    }
+    
+    function isWaiter() {
+      return getUserRole() == 'waiter';
+    }
+    
+    function isKitchen() {
+      return getUserRole() == 'kitchen';
+    }
+    
+    function isCashier() {
+      return getUserRole() == 'cashier';
+    }
+    
+    function belongsToRestaurant(resourceData) {
+      return resourceData.restaurantId == getRestaurantId();
+    }
+    
+    function isOwnerOfRestaurant(restaurantId) {
+      return isRestaurantOwner() && restaurantId == getRestaurantId();
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    
+    match /users/{userId} {
+      // Users can read their own document
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // SaaS admins can read all users
+      allow read: if isSaaSAdmin();
+      
+      // Restaurant owners and managers can read users in their tenant
+      allow read: if isAuthenticated() && 
+                     hasManagementAccess() &&
+                     resource.data.restaurantId == getRestaurantId();
+      
+      // Users can update their own profile (name, avatar, etc.)
+      allow update: if isAuthenticated() && 
+                       request.auth.uid == userId &&
+                       // Prevent changing critical fields
+                       request.resource.data.role == resource.data.role &&
+                       request.resource.data.restaurantId == resource.data.restaurantId;
+      
+      // Restaurant owners can create staff users in their tenant
+      allow create: if isRestaurantOwner() && 
+                       request.resource.data.restaurantId == getRestaurantId();
+      
+      // Allow user creation during signup (for restaurant owners)
+      allow create: if isAuthenticated() && 
+                       request.auth.uid == userId &&
+                       request.resource.data.role == 'restaurant_owner';
+      
+      // Restaurant owners can delete staff in their tenant
+      allow delete: if isRestaurantOwner() && 
+                       resource.data.restaurantId == getRestaurantId() &&
+                       userId != request.auth.uid; // Can't delete self
+    }
+    
+    // ============================================
+    // RESTAURANTS COLLECTION
+    // ============================================
+    
+    match /restaurants/{restaurantId} {
+      // Restaurant owners can read/write their own restaurant
+      allow read, write: if isAuthenticated() && 
+                            isOwnerOfRestaurant(restaurantId);
+      
+      // Managers can read restaurant settings (but not billing info)
+      allow read: if isAuthenticated() && 
+                     isRestaurantManager() && 
+                     restaurantId == getRestaurantId();
+      
+      // All staff can read basic restaurant info (name, logo, settings)
+      allow read: if isAuthenticated() && 
+                     restaurantId == getRestaurantId();
+      
+      // SaaS admins can read all restaurants
+      allow read: if isSaaSAdmin();
+      
+      // Allow creation during signup
+      allow create: if isAuthenticated() && 
+                       request.resource.data.ownerId == request.auth.uid;
+    }
+    
+    // ============================================
+    // MENU ITEMS COLLECTION
+    // ============================================
+    
+    match /menuItems/{itemId} {
+      // All staff can read menu items in their restaurant
+      allow read: if isAuthenticated() && belongsToRestaurant(resource.data);
+      
+      // Only owners and managers can modify menu
+      allow write: if isAuthenticated() && 
+                      hasManagementAccess() &&
+                      belongsToRestaurant(request.resource.data);
+    }
+    
+    // ============================================
+    // TABLES COLLECTION
+    // ============================================
+    
+    match /tables/{tableId} {
+      // All operational staff can read tables
+      allow read: if isAuthenticated() && belongsToRestaurant(resource.data);
+      
+      // Waiters and management can update table status
+      allow update: if isAuthenticated() && 
+                       (isWaiter() || hasManagementAccess()) &&
+                       belongsToRestaurant(resource.data);
+      
+      // Owners and managers can create/delete tables
+      allow create, delete: if isAuthenticated() && 
+                               hasManagementAccess() &&
+                               belongsToRestaurant(request.resource.data);
+    }
+    
+    // ============================================
+    // SESSIONS COLLECTION
+    // ============================================
+    
+    match /sessions/{sessionId} {
+      // All staff can read sessions in their restaurant
+      allow read: if isAuthenticated() && belongsToRestaurant(resource.data);
+      
+      // Waiters and management can create and update sessions
+      allow create, update: if isAuthenticated() && 
+                               (isWaiter() || hasManagementAccess()) &&
+                               belongsToRestaurant(request.resource.data);
+      
+      // Cashiers can update payment status
+      allow update: if isAuthenticated() && 
+                       isCashier() &&
+                       belongsToRestaurant(resource.data);
+      
+      // Only owners can delete sessions (for cleanup)
+      allow delete: if isRestaurantOwner() && 
+                       belongsToRestaurant(resource.data);
+    }
+    
+    // ============================================
+    // ORDERS COLLECTION
+    // ============================================
+    
+    match /orders/{orderId} {
+      // All staff can read orders in their restaurant
+      allow read: if isAuthenticated() && belongsToRestaurant(resource.data);
+      
+      // Waiters can create orders
+      allow create: if isAuthenticated() && 
+                       isWaiter() &&
+                       belongsToRestaurant(request.resource.data);
+      
+      // Kitchen and waiters can update order status
+      allow update: if isAuthenticated() && 
+                       (isKitchen() || isWaiter()) &&
+                       belongsToRestaurant(resource.data);
+      
+      // Management can do anything with orders
+      allow write: if isAuthenticated() && 
+                      hasManagementAccess() &&
+                      belongsToRestaurant(request.resource.data);
+    }
+    
+    // ============================================
+    // STAFF INVITATIONS COLLECTION
+    // ============================================
+    
+    match /staffInvitations/{invitationId} {
+      // Restaurant owners can read/write their invitations
+      allow read, write: if isAuthenticated() && 
+                            isRestaurantOwner() &&
+                            resource.data.restaurantId == getRestaurantId();
+      
+      // Allow creation of invitations
+      allow create: if isAuthenticated() && 
+                       isRestaurantOwner() &&
+                       request.resource.data.restaurantId == getRestaurantId();
+      
+      // Users can read invitations sent to their email
+      allow read: if isAuthenticated() && 
+                     resource.data.email == request.auth.token.email;
+      
+      // Users can accept their own invitations
+      allow update: if isAuthenticated() && 
+                       resource.data.email == request.auth.token.email &&
+                       resource.data.status == 'pending';
+    }
+    
+    // ============================================
+    // DENY ALL OTHER COLLECTIONS
+    // ============================================
+    
+    // Explicitly deny access to any other collections not defined above
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

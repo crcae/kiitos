@@ -1,0 +1,308 @@
+---
+title: Tailwind CSS Dropdown - Components Library @David UI
+description: Explore David UI's collection of dropdown menu examples that is perfect for enhancing the UI navigation and user experience of your web projects.
+github: dropdown
+prev: docs/html/chip
+next: docs/html/footer
+---
+
+<ScriptLoader />
+
+<InfoBadge />
+
+# Tailwind CSS Dropdown
+Choose from David UI's collection of dropdown examples designed to deliver your application's user experience faster. From simple dropdown menus to advanced configurations, we've got you covered.
+Each example is built with accessibility and responsiveness in mind, making it easy to integrate into any project.
+
+---
+
+## Basic Dropdown
+A simple dropdown menu with a trigger button. Contains basic menu items like "Add Team," "Add Project," and "My Profile." Ideal for straightforward navigation or quick actions.
+
+<PreviewWithCode relativePath="dropdown/dropdown-demo.tsx" language="html" />
+
+---
+
+## Nested Dropdown
+A dropdown menu with nested levels, allowing submenus for more detailed options. Features a right arrow icon indicating submenu expansion. Perfect for complex hierarchies or organized workflows.
+
+<PreviewWithCode relativePath="dropdown/dropdown-nested.tsx" language="html" />
+
+---
+
+## Dropdown Placement
+A versatile dropdown showcasing various placement options (top, bottom, left, right, and their variations). Demonstrates flexibility in positioning menus relative to the trigger button. Great for adaptive layouts or responsive designs.
+
+<PreviewWithCode relativePath="dropdown/dropdown-placement.tsx" language="html" />
+
+---
+
+## Nav Dropdown Menu
+A dropdown menu designed for navigation bars. Includes a mix of menu items and a promotional card for featured items. Features detailed descriptions and icons, making it suitable for navigation with additional context.
+
+<PreviewWithCode relativePath="dropdown/dropdown-nav-menu.tsx" language="html" />
+
+---
+
+## Dropdown with Divider
+A dropdown menu with a visual separator to group related items. Includes a "Logout" option styled distinctly in red for emphasis. Ideal for applications requiring logical separation between menu sections.
+
+<PreviewWithCode relativePath="dropdown/dropdown-divider.tsx" language="html" />
+
+---
+
+## Dropdown with Checkbox
+A dropdown menu incorporating checkboxes for multi-select functionality. Each menu item is selectable without closing the menu. Suitable for filters, sorting, or configuration settings.
+
+<PreviewWithCode relativePath="dropdown/dropdown-checkbox.tsx" language="html" />
+
+---
+
+## Dropdown with Search
+A dropdown menu with an integrated search bar at the top. Enables users to filter options dynamically before making a selection. Perfect for long lists or searchable menu content.
+
+<PreviewWithCode relativePath="dropdown/dropdown-search.tsx" language="html" />
+
+---
+
+## Dropdown with Scrolling Content
+A dropdown menu with scrollable content, handling long lists effectively. Displays up to 20+ items with a smooth scroll, ensuring usability in data-heavy scenarios.
+
+<PreviewWithCode relativePath="dropdown/dropdown-scrolling.tsx" language="html" />
+
+---
+
+## Notification Dropdown Menu
+A dropdown tailored for notifications. Features items with avatars, timestamps, and concise descriptions. Ideal for alerts, messages, or user activity summaries.
+
+<PreviewWithCode relativePath="dropdown/dropdown-notification.tsx" language="html" />
+
+---
+
+## Profile Dropdown Menu
+A dropdown menu styled for user profiles. Includes options like "My Profile," "Edit Profile," "Support," and "Logout." Features icons for visual cues and a divider for logical grouping. Perfect for user account settings or personal navigation.
+
+<PreviewWithCode relativePath="dropdown/dropdown-profile.tsx" language="html" />
+
+---
+
+## Required Script
+
+The Dropdown component in david-ai requires JavaScript to handle the dropdown functionality and positioning. The library provides smooth transitions and toggle behavior through data attributes, powered by Popper.js for accurate positioning.
+
+### Installation
+
+To use the Dropdown component in your project, you first need to install the `david-ai` library via npm:
+
+<CodePreviewTailwindClasses codeSnippet={`npm install david-ai`}/>
+
+### Basic Usage
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { initDropdowns } from 'david-ai';
+
+// Initialize dropdown functionality
+initDropdowns();
+`
+}/>
+
+### Using with Global Access
+If you prefer, you can use the DavidAI global object instead of directly importing initDropdowns:
+
+<CodePreviewTailwindClasses codeSnippet={
+`import * as DavidAI from 'david-ai';
+
+// Initialize dropdown functionality
+DavidAI.initDropdowns();
+`
+}/>
+
+### Using with CDN
+You can include david-ai via a CDN and initialize dropdown functionality globally in the browser. Add the following script to your HTML file:
+
+<CodePreviewTailwindClasses codeSnippet={`<script src="https://cdn.jsdelivr.net/gh/creativetimofficial/david-ai@1.0.6/packages/dist/david-ai.min.js" defer></script>`}/>
+
+### HTML Code Example
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div class="dropdown" data-dui-placement="bottom-start">
+  <button data-dui-toggle="dropdown" 
+          aria-expanded="false" 
+          class="inline-flex items-center justify-center px-4 py-2 text-sm text-stone-50 bg-stone-800 hover:bg-stone-700 rounded-lg shadow-sm hover:shadow-md transition">
+    Open
+  </button>
+  <div data-dui-role="menu" class="hidden mt-2 bg-white border border-stone-200 rounded-lg shadow-sm p-1 z-10">
+    <a href="#" class="block px-4 py-2 text-sm text-stone-800 hover:bg-stone-100 rounded-md">Add Team</a>
+    <a href="#" class="block px-4 py-2 text-sm text-stone-800 hover:bg-stone-100 rounded-md">Add Project</a>
+    <a href="#" class="block px-4 py-2 text-sm text-stone-800 hover:bg-stone-100 rounded-md">My Profile</a>
+  </div>
+</div>`
+}/>
+
+---
+
+## TypeScript
+
+David AI Dropdown component can be used programmatically with TypeScript support for more control and type safety:
+
+### Programmatic Usage with TypeScript
+
+Learn how to use David AI's Dropdown component with TypeScript for dynamic menu toggling. This component provides programmatic methods to open, close and position dropdown menus with full type safety and customization options.
+
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { Dropdown } from "david-ai";
+import type { DropdownConfig, IDropdown } from "david-ai";
+
+// Initialize the Dropdown
+document.addEventListener("DOMContentLoaded", () => {
+  const dropdownButton = document.querySelector<HTMLElement>("#dropdown-button");
+  const dropdownMenu = document.querySelector<HTMLElement>("#dropdown-menu");
+
+  if (dropdownButton && dropdownMenu) {
+
+    const config: DropdownConfig = {
+      placement: "bottom-start",
+      closeOnOutsideClick: true,
+      offset: [0, 5],
+    };
+
+    const dropdown: IDropdown = new Dropdown(dropdownButton, dropdownMenu, config);
+
+    // Main button toggle
+    dropdownButton.addEventListener("click", () => {
+      dropdown.toggle();
+    });
+
+    // External buttons
+    const toggleButton = document.querySelector<HTMLElement>("#toggle-dropdown");
+    toggleButton?.addEventListener("click", () => {
+      dropdown.preventOutsideClick();
+      dropdown.toggle();
+    });
+
+    const openButton = document.querySelector<HTMLElement>("#open-dropdown");
+    openButton?.addEventListener("click", () => {
+      dropdown.preventOutsideClick();
+      dropdown.open();
+    });
+
+    const closeButton = document.querySelector<HTMLElement>("#close-dropdown");
+    closeButton?.addEventListener("click", () => {
+      dropdown.preventOutsideClick();
+      dropdown.close();
+    });
+
+    // Clean up resources when the page is unloaded
+    window.addEventListener("unload", () => {
+      dropdown.destroy();
+    });
+  } else {
+    console.error("Dropdown button or menu not found");
+  }
+});`
+}/>
+
+### HTML Structure
+
+The HTML structure demonstrates an accessible and interactive dropdown component featuring:
+
+- A semantic button element for triggering the dropdown menu
+- ARIA attributes for screen reader support 
+- Smooth transitions and animations for menu visibility
+- Dark and light theme compatibility with Tailwind CSS
+- Responsive dropdown menu with hover states
+- Additional control buttons for programmatic interaction
+- Proper z-index handling for menu layering
+- Click outside detection for automatic closing
+
+Here's the complete HTML implementation:
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div class="dropdown-container">
+    <!-- Reference Element -->
+    <button id="dropdown-button" aria-expanded="false" class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased dark:bg-stone-700 dark:hover:bg-stone-600 dark:from-stone-600 dark:to-stone-700 dark:border-stone-800">
+      Toggle Dropdown
+    </button>
+
+    <!-- Method Buttons -->
+    <div class="mt-2 space-x-2">
+      <button id="toggle-dropdown" aria-expanded="false" class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased dark:bg-stone-700 dark:hover:bg-stone-600 dark:from-stone-600 dark:to-stone-700 dark:border-stone-800">
+        Toggle
+      </button>
+      <button id="open-dropdown" aria-expanded="false" class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased dark:bg-stone-700 dark:hover:bg-stone-600 dark:from-stone-600 dark:to-stone-700 dark:border-stone-800">
+        Open
+      </button>
+      <button id="close-dropdown" aria-expanded="false" class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased dark:bg-stone-700 dark:hover:bg-stone-600 dark:from-stone-600 dark:to-stone-700 dark:border-stone-800">
+        Close
+      </button>
+    </div>
+  
+    <!-- Dropdown Menu -->
+    <div id="dropdown-menu" class="hidden mt-2 bg-white dark:bg-stone-800 border border-stone-200 dark:border-stone-700 rounded-lg shadow-sm p-1 z-10">
+      <ul>
+        <li class="block px-4 py-2 text-sm text-stone-800 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-md">Item 1</li>
+        <li class="block px-4 py-2 text-sm text-stone-800 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-md">Item 2</li>
+        <li class="block px-4 py-2 text-sm text-stone-800 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-stone-700 rounded-md">Item 3</li>
+      </ul>
+    </div>
+  </div>`
+}/>
+
+---
+
+### Props & Methods
+The Dropdown component provides a way to toggle the visibility of popup menus with smooth animations and accessibility features. It supports menu positioning, outside click detection, and programmatic control through methods like toggle, open, and close.
+
+<br></br>
+
+<TsPropsTable data={[
+  {
+    interface: "DropdownConfig",
+    property: "placement",
+    type: "string (optional)",
+    description: "Specifies the dropdown menu placement relative to the trigger button. Default is 'bottom-start'."
+  },
+  {
+    interface: "DropdownConfig",
+    property: "closeOnOutsideClick", 
+    type: "boolean (optional)",
+    description: "Whether to close the dropdown when clicking outside. Default is true."
+  },
+  {
+    interface: "DropdownConfig",
+    property: "offset",
+    type: "number[] (optional)",
+    description: "Offset [x, y] in pixels for the dropdown menu position. Default is [0, 5]."
+  },
+  {
+    interface: "IDropdown",
+    property: "toggle()",
+    type: "void",
+    description: "Toggles the dropdown menu visibility."
+  },
+  {
+    interface: "IDropdown",
+    property: "open()",
+    type: "void",
+    description: "Opens the dropdown menu programmatically."
+  },
+  {
+    interface: "IDropdown", 
+    property: "close()",
+    type: "void",
+    description: "Closes the dropdown menu programmatically."
+  },
+  {
+    interface: "IDropdown",
+    property: "preventOutsideClick()",
+    type: "void",
+    description: "Prevents the dropdown from closing on the next outside click."
+  },
+  {
+    interface: "IDropdown",
+    property: "destroy()",
+    type: "void", 
+    description: "Destroys the dropdown instance and cleans up resources."
+  }
+]} />

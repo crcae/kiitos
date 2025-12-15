@@ -1,85 +1,202 @@
-import { useState } from 'react';
-import { View, Text, Alert, Image } from 'react-native';
-import { useRouter, Link } from 'expo-router';
+import React, { useState } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    KeyboardAvoidingView,
+    ScrollView,
+    Platform,
+    Alert,
+} from 'react-native';
+import { Link, useRouter } from 'expo-router';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../services/firebaseConfig';
-import Button from '../components/Button';
-import Input from '../components/Input';
+import AirbnbButton from '../components/AirbnbButton';
+import AirbnbInput from '../components/AirbnbInput';
+import { colors, spacing, typography } from '../styles/theme';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
     const router = useRouter();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState({ email: '', password: '' });
 
     const handleLogin = async () => {
-        if (!email || !password) {
-            Alert.alert('Error', 'Por favor ingresa correo y contraseña');
+        // Reset errors
+        setErrors({ email: '', password: '' });
+
+        // Validate
+        if (!email) {
+            setErrors(prev => ({ ...prev, email: 'El correo es requerido' }));
             return;
         }
+        if (!password) {
+            setErrors(prev => ({ ...prev, password: 'La contraseña es requerida' }));
+            return;
+        }
+
         setLoading(true);
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            router.replace('/'); // Navigate to home
+            router.replace('/');
         } catch (error: any) {
-            Alert.alert('Error al iniciar sesión', error.message);
+            Alert.alert(
+                'Error',
+                error.code === 'auth/invalid-credential'
+                    ? 'Correo o contraseña incorrectos'
+                    : 'Error al iniciar sesión'
+            );
         } finally {
             setLoading(false);
         }
     };
 
     const handleGoogleLogin = () => {
-        // TODO: Implement Google Sign-In
-        Alert.alert('Info', 'Google Sign-In requiere configuración adicional (SHA-1, etc.)');
+        Alert.alert(
+            'Próximamente',
+            'Registro con Google estará disponible pronto'
+        );
     };
 
     return (
-        <View className="flex-1 bg-white p-6 justify-center">
-            <View className="items-center mb-10">
-                <Text className="text-3xl font-bold text-rose-500 mb-2">Kiitos</Text>
-                <Text className="text-lg text-gray-600">Bienvenido de nuevo</Text>
-            </View>
+        <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
+            <KeyboardAvoidingView
+                style={styles.keyboardView}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            >
+                <ScrollView
+                    contentContainerStyle={styles.scrollContent}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                >
+                    <View style={styles.content}>
+                        {/* Header */}
+                        <View style={styles.header}>
+                            <Text style={styles.title}>Bienvenido a Kiitos</Text>
+                            <Text style={styles.subtitle}>Divide cuentas de forma fácil</Text>
+                        </View>
 
-            <Input
-                label="Correo Electrónico"
-                value={email}
-                onChangeText={setEmail}
-                placeholder="ejemplo@correo.com"
-                keyboardType="email-address"
-            />
-            <Input
-                label="Contraseña"
-                value={password}
-                onChangeText={setPassword}
-                placeholder="********"
-                secureTextEntry
-            />
+                        {/* Form */}
+                        <View style={styles.form}>
+                            <AirbnbInput
+                                label="Correo Electrónico"
+                                value={email}
+                                onChangeText={setEmail}
+                                keyboardType="email-address"
+                                autoCapitalize="none"
+                                autoComplete="email"
+                                placeholder="ejemplo@correo.com"
+                                error={errors.email}
+                            />
 
-            <Button
-                title="Iniciar Sesión"
-                onPress={handleLogin}
-                loading={loading}
-                className="mt-4"
-            />
+                            <AirbnbInput
+                                label="Contraseña"
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry
+                                autoComplete="password"
+                                placeholder="••••••••"
+                                error={errors.password}
+                            />
 
-            <View className="my-6 flex-row items-center">
-                <View className="flex-1 h-px bg-gray-200" />
-                <Text className="mx-4 text-gray-400">O</Text>
-                <View className="flex-1 h-px bg-gray-200" />
-            </View>
+                            <AirbnbButton
+                                title="Continuar"
+                                onPress={handleLogin}
+                                loading={loading}
+                                variant="primary"
+                            />
+                        </View>
 
-            <Button
-                title="Iniciar sesión con Google"
-                onPress={handleGoogleLogin}
-                variant="google"
-            />
+                        {/* Divider */}
+                        <View style={styles.dividerContainer}>
+                            <View style={styles.dividerLine} />
+                            <Text style={styles.dividerText}>O</Text>
+                            <View style={styles.dividerLine} />
+                        </View>
 
-            <View className="flex-row justify-center mt-8">
-                <Text className="text-gray-600">¿No tienes cuenta? </Text>
-                <Link href="/sign-up" asChild>
-                    <Text className="text-rose-500 font-bold">Regístrate</Text>
-                </Link>
-            </View>
-        </View>
+                        {/* Google Sign-In */}
+                        <AirbnbButton
+                            title="Iniciar sesión con Google"
+                            onPress={handleGoogleLogin}
+                            variant="google"
+                            icon="logo-google"
+                        />
+
+                        {/* Sign Up Link */}
+                        <View style={styles.footer}>
+                            <Text style={styles.footerText}>¿No tienes cuenta? </Text>
+                            <Link href="/sign-up" asChild>
+                                <Text style={styles.footerLink}>Regístrate</Text>
+                            </Link>
+                        </View>
+                    </View>
+                </ScrollView>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
     );
 }
+
+const styles = StyleSheet.create({
+    container: {
+        flex: 1,
+        backgroundColor: colors.white,
+    },
+    keyboardView: {
+        flex: 1,
+    },
+    scrollContent: {
+        flexGrow: 1,
+        justifyContent: 'center',
+    },
+    content: {
+        paddingHorizontal: spacing.xl,
+        paddingVertical: spacing.xxxl,
+    },
+    header: {
+        marginBottom: spacing.xxxl,
+    },
+    title: {
+        fontSize: typography.xxxxl,
+        fontWeight: typography.bold,
+        color: colors.darkText,
+        marginBottom: spacing.sm,
+    },
+    subtitle: {
+        fontSize: typography.lg,
+        color: colors.darkGray,
+    },
+    form: {
+        marginBottom: spacing.xl,
+    },
+    dividerContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginVertical: spacing.xl,
+    },
+    dividerLine: {
+        flex: 1,
+        height: 1,
+        backgroundColor: colors.lightGray,
+    },
+    dividerText: {
+        marginHorizontal: spacing.lg,
+        fontSize: typography.sm,
+        color: colors.gray,
+    },
+    footer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        marginTop: spacing.xl,
+    },
+    footerText: {
+        fontSize: typography.base,
+        color: colors.gray,
+    },
+    footerLink: {
+        fontSize: typography.base,
+        color: colors.airbnbPink,
+        fontWeight: typography.semibold,
+    },
+});

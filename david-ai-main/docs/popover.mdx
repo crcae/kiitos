@@ -1,0 +1,298 @@
+---
+title: Tailwind CSS Popover - Components Library @David UI
+description: Create interactive popovers with Tailwind CSS and David UI. Enhance your UI with customizable and responsive popover components.
+github: popover
+---
+
+<ScriptLoader />
+
+<InfoBadge />
+
+# Tailwind CSS Popover 
+
+David UI's Popover component delivers an interactive way to display contextual information or actions. Styled with Tailwind CSS, it supports customizable triggers, animations, and layouts for a seamless user experience.
+
+Explore our responsive Popover component examples, styled with Tailwind CSS, ideal for enhancing functionality in your web or mobile projects.
+
+---
+
+## Basic Popover
+
+A simple and clean Popover component example, featuring a button trigger and a small content area. Ideal for providing quick information or additional context when interacting with a button or other elements.
+
+<PreviewWithCode relativePath="popover/popover-demo.tsx" language="html" />
+
+---
+
+
+## Popover Placement
+
+This example demonstrates the versatility of the Popover component with various placement options, including `top`, `right`, `bottom`, and `left`. Perfect for tailoring popover positions to suit different layouts and use cases.
+
+
+<PreviewWithCode relativePath="popover/popover-placement.tsx" language="html" />
+
+---
+
+## Subscription Popover
+
+An interactive Popover component designed for newsletter subscriptions. It includes an email input field and a subscribe button, making it a great addition for capturing user engagement in a compact, non-intrusive way.
+
+<PreviewWithCode relativePath="popover/subscription-popover.tsx" language="html" />
+
+---
+
+## Contact Popover
+
+A detailed Popover component showcasing contact information, including name, role, company, phone, and email. Ideal for displaying a quick and accessible contact card in applications like CRM systems or directory lists.
+
+<PreviewWithCode relativePath="popover/contact-popover.tsx" language="html" />
+
+---
+
+## Popover with Image
+
+A visually rich Popover example that combines text and an image. Useful for highlighting key information alongside an accompanying visual element, such as product descriptions, profiles, or media content.
+
+<PreviewWithCode relativePath="popover/popover-with-image.tsx" language="html" />
+
+---
+
+## Profile Info Popover
+
+A comprehensive Popover for displaying profile details, including an avatar, bio, and additional information like location and organization. Features a follow button for user interaction, making it perfect for social or professional networking platforms.
+
+<PreviewWithCode relativePath="popover/profile-info-popover.tsx" language="html" />
+
+---
+
+## Popover with Description
+
+A detailed Popover component tailored for repository or project information. Includes key details like a public/private tag, programming language, star rating, and verification status, making it ideal for use in developer tools or project management dashboards.
+
+<PreviewWithCode relativePath="popover/popover-with-description.tsx" language="html" />
+
+--- 
+
+## Required Script
+
+The Popover component in david-ai requires JavaScript to handle the popover functionality and positioning. The library provides smooth transitions and toggle behavior through data attributes, powered by Popper.js for accurate positioning.
+
+### Installation
+
+To use the Popover component in your project, you first need to install the `david-ai` library via npm:
+
+<CodePreviewTailwindClasses codeSnippet={`npm install david-ai`}/>
+
+### Basic Usage
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { initPopovers } from 'david-ai';
+
+// Initialize popover functionality
+initPopovers();
+`
+}/>
+
+### Using with Global Access
+If you prefer, you can use the DavidAI global object instead of directly importing initPopovers:
+
+<CodePreviewTailwindClasses codeSnippet={
+`import * as DavidAI from 'david-ai';
+
+// Initialize popover functionality
+DavidAI.initPopovers();
+`
+}/>
+
+### Using with CDN
+You can include david-ai via a CDN and initialize popover functionality globally in the browser. Add the following script to your HTML file:
+
+<CodePreviewTailwindClasses codeSnippet={`<script src="https://cdn.jsdelivr.net/gh/creativetimofficial/david-ai@1.0.6/packages/dist/david-ai.min.js" defer></script>`}/>
+
+### HTML Code Example
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div class="flex justify-center">
+  <button type="button" 
+          data-dui-toggle="popover" 
+          data-dui-placement="top"
+          data-dui-content="This is a popover content"
+          data-dui-title="Popover Title"
+          data-dui-popover-class="bg-white text-stone-800 border border-stone-200 rounded-md shadow-sm p-2 text-sm z-50"
+          class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased">
+    Click me
+  </button>
+</div>`
+}/>
+
+---
+
+## TypeScript
+
+David AI Popover component can be used programmatically with TypeScript support for more control and type safety:
+
+### Programmatic Usage with TypeScript
+
+Learn how to use David AI's Popover component with TypeScript for dynamic tooltip control. This component provides programmatic methods to open, close and configure popovers with full type safety and customization options.
+
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { Popover } from "david-ai";
+  import type { PopoverConfig, IPopover } from "david-ai";
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const triggerElement = document.getElementById("popover-trigger");
+
+    if (!triggerElement) {
+      console.error("Trigger element not found.");
+      return;
+    }
+
+    // Configure the popover options
+    const popoverConfig: PopoverConfig = {
+      placement: "top",
+      popoverClass: "bg-white text-stone-800 border border-stone-200 rounded-md shadow-sm p-2 text-sm z-50", 
+      content: "This is a dynamic popover!",
+      openByDefault: false,
+      offset: [0, 10]
+    };
+
+    // Initialize the Popover with type safety
+    const popover: IPopover = new Popover(triggerElement, popoverConfig);
+
+    // External controls for the Popover
+    const openButton = document.getElementById("openPopover");
+    const closeButton = document.getElementById("closePopover");
+    const toggleButton = document.getElementById("togglePopover");
+
+    if (openButton) {
+      openButton.addEventListener("click", () => popover.open());
+    }
+
+    if (closeButton) {
+      closeButton.addEventListener("click", () => popover.close());
+    }
+
+    if (toggleButton) {
+      toggleButton.addEventListener("click", () => popover.toggle());
+    }
+
+    // Clean up when the page is unloaded
+    window.addEventListener("unload", () => {
+      popover.destroy();
+    });
+});`
+}/>
+
+### HTML Structure
+
+The HTML structure demonstrates an accessible and interactive popover component featuring:
+
+- A semantic button element for triggering the popover
+- ARIA attributes and roles for screen reader support
+- Smooth transitions and animations for popover visibility
+- Dark and light theme compatibility with Tailwind CSS
+- Responsive popover with flexible sizing
+- Customizable content and styling options
+- Proper z-index handling for layering
+- Multiple placement options (top, right, bottom, left)
+- Programmatic control through JavaScript methods
+
+Here's the complete HTML implementation:
+
+<CodePreviewTailwindClasses codeSnippet={
+`<!-- Trigger Button -->
+    <button
+      id="popover-trigger"
+      class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased"
+    >
+      Click Me
+    </button>
+
+    <!-- External Buttons for Control -->
+    <div class="flex gap-4">
+      <button
+        id="openPopover"
+        class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased"
+      >
+        Open Popover
+      </button>
+      <button
+        id="closePopover"
+        class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased"
+      >
+        Close Popover
+      </button>
+      <button
+        id="togglePopover"
+        class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased"
+      >
+        Toggle Popover
+      </button>
+    </div>`
+}/>
+
+---
+
+### Props & Methods
+The Popover component provides a way to display floating content anchored to trigger elements. It supports customizable positioning, dynamic content updates, and programmatic control through methods like open, close and toggle.
+
+<br></br>
+
+<TsPropsTable data={[
+  {
+    interface: "PopoverConfig",
+    property: "placement",
+    type: "string (optional)",
+    description: "The placement of the popover relative to the trigger."
+  },
+  {
+    interface: "PopoverConfig",
+    property: "popoverClass",
+    type: "string (optional)",
+    description: "Custom classes to apply to the popover element."
+  },
+  {
+    interface: "PopoverConfig",
+    property: "content",
+    type: "string | HTMLElement (optional)",
+    description: "Plain text content for the popover."
+  },
+  {
+    interface: "PopoverConfig",
+    property: "openByDefault",
+    type: "boolean (optional)",
+    description: "Whether the popover is open by default."
+  },
+  {
+    interface: "PopoverConfig",
+    property: "offset",
+    type: "[number, number] (optional)",
+    description: "Offset for the popover position."
+  },
+  {
+    interface: "IPopover",
+    property: "open()",
+    type: "void",
+    description: "Opens the popover programmatically."
+  },
+  {
+    interface: "IPopover",
+    property: "close()",
+    type: "void", 
+    description: "Closes the popover programmatically."
+  },
+  {
+    interface: "IPopover",
+    property: "toggle()",
+    type: "void",
+    description: "Toggles the popover's visibility programmatically."
+  },
+  {
+    interface: "IPopover",
+    property: "destroy()",
+    type: "void",
+    description: "Destroys the Popover instance and cleans up resources."
+  }
+]} />

@@ -1,0 +1,301 @@
+---
+title: Tailwind CSS Accordion - Components Library @David UI
+description: Discover Tailwind CSS accordion components at David UI. Create expandable sections for FAQs, menus, and more with responsive, customizable designs.
+github: accordion
+prev: docs/react/text-area
+next: docs/react/avatar
+---
+
+<ScriptLoader />
+
+<InfoBadge />
+
+# Tailwind CSS Accordion
+
+David UI's accordion component is built with Tailwind CSS and HTML to create sleek expand/collapse sections. Perfect for FAQs, menus, and content toggling, it provides an interactive way to organize information. 
+
+Customize styles effortlessly and explore examples to integrate this versatile, responsive component into your design.
+
+
+---
+
+## Basic Accordion
+
+Create an SEO-optimized accordion component with exclusive mode using `data-dui-accordion-mode="exclusive"`. This ensures only one section stays open at a time, ideal for FAQ pages and content organization. The semantic HTML and ARIA attributes enhance both accessibility and search engine visibility while providing an excellent user experience.
+
+<PreviewWithCode relativePath="accordion/accordion-demo.tsx" language="html" />
+
+---
+
+## Accordion All Open
+
+Enhance content accessibility and SEO with the "all-open" accordion mode. Using `data-dui-accordion-mode="all-open"` allows users to view multiple sections simultaneously while maintaining collapse functionality. This feature optimizes content visibility and user engagement by displaying information upfront. Ideal for documentation and content-rich pages, the semantic HTML and ARIA attributes ensure proper accessibility and search engine indexing.
+
+<PreviewWithCode relativePath="accordion/accordion-all-open.tsx" language="html" />
+
+---
+
+## Controlled Accordion
+
+The Accordion component can operate in both controlled and uncontrolled modes. In controlled mode, you have full control over its state using the `value` and `onValueChange` properties.
+
+<PreviewWithCode relativePath="accordion/controlled-accordion.tsx" language="html" />
+
+---
+
+## Accordion Custom Icon
+
+Customize the accordion's toggle icons using `data-dui-accordion-icon-close` and `data-dui-accordion-icon-open` attributes. These allow you to seamlessly switch between different icons based on the accordion's open/closed state, enhancing visual feedback and user experience.
+
+<PreviewWithCode relativePath="accordion/accordion-custom-icon.tsx" language="html" />
+
+---
+
+## Accordion Custom Styles
+
+Tailor the appearance of your Accordion by applying styles through the `className` property. The example demonstrates how to design a unique look for the Accordion component.
+
+<PreviewWithCode relativePath="accordion/accordion-custom-styles.tsx" language="html" />
+
+---
+
+## Accordion Disabled
+
+Enhance accessibility and user experience by disabling specific accordion sections using `aria-disabled="true"`. This attribute prevents user interaction and clearly indicates non-interactive content, improving both SEO and usability. Disabled sections maintain visual consistency while being properly marked up for screen readers and search engines.
+
+<PreviewWithCode relativePath="accordion/accordion-disabled.tsx" language="html" />
+
+---
+
+## Required Script
+
+The Accordion component in david-ai requires JavaScript to handle the accordion functionality. The library provides smooth transitions and collapse/expand behavior through data attributes.
+
+### Installation
+
+To use the Accordion component in your project, you first need to install the `david-ai` library via npm:
+
+<CodePreviewTailwindClasses codeSnippet={`npm install david-ai`}/>
+
+### Basic Usage
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { initAccordion } from 'david-ai';
+
+// Initialize accordion functionality
+initAccordion();
+`
+}/>
+
+### Using with Global Access
+If you prefer, you can use the DavidAI global object instead of directly importing initAccordion:
+
+<CodePreviewTailwindClasses codeSnippet={
+`import * as DavidAI from 'david-ai';
+
+// Initialize accordion functionality
+DavidAI.initAccordion();
+`
+}/>
+
+### Using with CDN
+You can include david-ai via a CDN and initialize accordion functionality globally in the browser. Add the following script to your HTML file:
+
+<CodePreviewTailwindClasses codeSnippet={`<script src="https://cdn.jsdelivr.net/gh/creativetimofficial/david-ai@1.0.6/packages/dist/david-ai.min.js" defer></script>`}/>
+
+### HTML Code Example
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div class="group block w-full" aria-disabled="false" data-dui-accordion-container data-dui-accordion-mode="exclusive">
+    <div 
+      class="flex items-center justify-between w-full py-5 text-left font-medium dark:text-white text-stone-800 cursor-pointer"
+      data-dui-accordion-toggle
+      data-dui-accordion-target="#basicAccordion1"
+      aria-expanded="false">
+      What is David UI?
+      <svg data-dui-accordion-icon width="1.5em" height="1.5em" strokeWidth="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" color="currentColor" class="h-4 w-4 rotate-180">
+        <path d="M6 9L12 15L18 9" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"></path>
+      </svg>
+    </div>
+    <div id="basicAccordion1" class="overflow-hidden transition-all duration-300 border-b border-stone-200 dark:border-stone-700">
+      <p class="mb-5 text-sm text-stone-500 dark:text-stone-400">David UI is a comprehensive UI library built with Tailwind CSS, offering modern and customizable components for web development.</p>
+    </div>
+
+    <div 
+      class="flex items-center justify-between w-full py-5 text-left font-medium dark:text-white text-stone-800 cursor-pointer"
+      data-dui-accordion-toggle
+      data-dui-accordion-target="#basicAccordion2"
+      aria-expanded="false">
+      Why choose David UI?
+      <svg data-dui-accordion-icon width="1.5em" height="1.5em" strokeWidth="1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" color="currentColor" class="h-4 w-4">
+        <path d="M6 9L12 15L18 9" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"></path>
+      </svg>
+    </div>
+    <div id="basicAccordion2" class="overflow-hidden transition-all duration-300 border-b border-stone-200 dark:border-stone-700">
+      <p class="mb-5 text-sm text-stone-500 dark:text-stone-400">David UI provides an extensive collection of ready-to-use components with seamless integration and excellent developer experience.</p>
+    </div>
+  </div>`
+}/>
+
+---
+
+## TypeScript
+
+David AI Accordion component can be used programmatically with TypeScript support for more control and type safety:
+
+### Programmatic Usage with TypeScript
+
+Learn how to use David AI's Accordion component with TypeScript for dynamic section toggling. This component provides programmatic methods to open, close and control accordion sections with full type safety and customization options.
+
+
+<CodePreviewTailwindClasses codeSnippet={
+`import { Accordion } from "david-ai";
+import type { AccordionConfig, IAccordion } from "david-ai";
+
+// Initialize the Accordion
+document.addEventListener("DOMContentLoaded", () => {
+  const container = document.getElementById('accordion-container');
+
+  if (container) {
+    const config: AccordionConfig = {
+      exclusive: true,
+      allOpen: false,
+    };
+
+    const accordion: IAccordion = new Accordion(container, config);
+
+    // Handle external button controls
+    const showAllButton = document.getElementById('show-all');
+    const hideAllButton = document.getElementById('hide-all');
+    const toggleFirstButton = document.getElementById('toggle-first');
+
+    showAllButton?.addEventListener('click', () => {
+      accordion.showAll();
+    });
+
+    hideAllButton?.addEventListener('click', () => {
+      accordion.hideAll(); 
+    });
+
+    toggleFirstButton?.addEventListener('click', () => {
+      const firstButton = document.getElementById('button-1') as HTMLElement;
+      if (firstButton) {
+        accordion.toggle(firstButton);
+      }
+    });
+  }
+});`
+}/>
+
+### HTML Structure
+
+The HTML structure demonstrates an accessible and interactive accordion component featuring:
+
+- Semantic button elements for triggering each accordion section
+- ARIA attributes and states for screen reader support
+- Smooth height transitions and animations for content visibility 
+- Dark and light theme compatibility with Tailwind CSS
+- Responsive content sections with hover states
+- Additional control buttons for programmatic interaction
+- Proper content overflow handling
+- Exclusive mode where only one section can be open at a time
+
+Here's the complete HTML implementation:
+
+<CodePreviewTailwindClasses codeSnippet={
+`<div id="accordion-container" class="group block w-full" aria-disabled="false">
+    <div
+      class="flex items-center justify-between w-full py-5 text-left font-medium dark:text-white text-stone-800 cursor-pointer"
+      id="button-1" aria-expanded="false">
+      What is David UI?
+      <svg data-dui-accordion-icon width="1.5em" height="1.5em" strokeWidth="1.5" viewBox="0 0 24 24" fill="none"
+        xmlns="http://www.w3.org/2000/svg" color="currentColor" class="h-4 w-4 transition-transform duration-300">
+        <path d="M6 9L12 15L18 9" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"></path>
+      </svg>
+    </div>
+    <div id="basicAccordion1"
+      class="overflow-hidden transition-all duration-300 border-b border-stone-200 dark:border-stone-700">
+      <p class="mb-5 text-sm text-stone-500 dark:text-stone-400">David UI is a comprehensive UI library built with
+        Tailwind CSS, offering modern and customizable components for web development.</p>
+    </div>
+  
+    <div
+      class="flex items-center justify-between w-full py-5 text-left font-medium dark:text-white text-stone-800 cursor-pointer"
+      id="button-2" aria-expanded="false">
+      Why choose David UI?
+      <svg data-dui-accordion-icon width="1.5em" height="1.5em" strokeWidth="1.5" viewBox="0 0 24 24" fill="none"
+        xmlns="http://www.w3.org/2000/svg" color="currentColor" class="h-4 w-4 transition-transform duration-300">
+        <path d="M6 9L12 15L18 9" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round"></path>
+      </svg>
+    </div>
+    <div id="basicAccordion2"
+      class="overflow-hidden transition-all duration-300 border-b border-stone-200 dark:border-stone-700">
+      <p class="mb-5 text-sm text-stone-500 dark:text-stone-400">David UI provides an extensive collection of ready-to-use
+        components with seamless integration and excellent developer experience.</p>
+    </div>
+  </div>
+
+  <div class="flex gap-4 mt-4">
+    <button class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased" id="show-all">Show All</button>
+    <button class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased" id="hide-all">Hide All</button>
+    <button class="inline-flex items-center justify-center border align-middle select-none font-sans font-medium text-center duration-300 ease-in disabled:opacity-50 disabled:shadow-none disabled:cursor-not-allowed focus:shadow-none text-sm py-2 px-4 shadow-sm hover:shadow-md bg-stone-800 hover:bg-stone-700 relative bg-gradient-to-b from-stone-700 to-stone-800 border-stone-900 text-stone-50 rounded-lg hover:bg-gradient-to-b hover:from-stone-800 hover:to-stone-800 hover:border-stone-900 after:absolute after:inset-0 after:rounded-[inherit] after:box-shadow after:shadow-[inset_0_1px_0px_rgba(255,255,255,0.25),inset_0_-2px_0px_rgba(0,0,0,0.35)] after:pointer-events-none transition antialiased" id="toggle-first">Toggle First</button>
+  </div>`
+}/>
+
+---
+
+### Props & Methods
+The Accordion component provides a way to create collapsible content sections with smooth animations and accessibility features. It supports exclusive mode where only one section can be open at a time, as well as programmatic control through methods like toggle, show, hide, showAll, and hideAll.
+
+<br></br>
+
+<TsPropsTable data={[
+  {
+    interface: "AccordionConfig",
+    property: "exclusive",
+    type: "boolean (optional)",
+    description: "When true, only one section can be open at a time. Default is false."
+  },
+  {
+    interface: "AccordionConfig",
+    property: "allOpen",
+    type: "boolean (optional)", 
+    description: "When true, allows multiple sections to be open simultaneously. Default is false."
+  },
+  {
+    interface: "IAccordion",
+    property: "toggle(element)",
+    type: "void",
+    description: "Toggles the open/closed state of an accordion section. Element can be HTMLElement or string ID."
+  },
+  {
+    interface: "IAccordion",
+    property: "show(element)",
+    type: "void",
+    description: "Opens an accordion section. Element can be HTMLElement or string ID."
+  },
+  {
+    interface: "IAccordion",
+    property: "hide(element)",
+    type: "void",
+    description: "Closes an accordion section. Element can be HTMLElement or string ID."
+  },
+  {
+    interface: "IAccordion",
+    property: "showAll()",
+    type: "void",
+    description: "Opens all accordion sections simultaneously."
+  },
+  {
+    interface: "IAccordion",
+    property: "hideAll()",
+    type: "void",
+    description: "Closes all accordion sections simultaneously."
+  },
+  {
+    interface: "IAccordion",
+    property: "cleanup()",
+    type: "void",
+    description: "Removes all event listeners and cleans up the accordion instance."
+  }
+]} />
