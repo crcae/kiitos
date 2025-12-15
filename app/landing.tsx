@@ -14,7 +14,7 @@ export default function LandingPage() {
             {/* Navbar - David AI Style */}
             <View className="w-full px-4 py-4 sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-stone-200">
                 <View className="max-w-6xl mx-auto w-full flex-row items-center justify-between">
-                    <Text className="font-bold text-xl text-stone-900">Kiitos</Text>
+                    <Text className="font-bold text-xl text-stone-900">Kitos</Text>
 
                     {/* Desktop Menu */}
                     <View className="hidden md:flex flex-row items-center gap-6">
@@ -126,7 +126,7 @@ export default function LandingPage() {
                 <View className="max-w-4xl mx-auto text-center">
                     <Text className="text-2xl font-bold text-stone-900 mb-4">Más de 100 restaurantes confían en Kiitos</Text>
                     <Text className="text-stone-500 text-lg">
-                        Únete a la comunidad de restaurantes que han modernizado su operación
+                        Únete a la comunidad de restaurantes que han modernizado su operaciónes
                     </Text>
                 </View>
             </View>
