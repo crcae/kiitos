@@ -126,7 +126,7 @@ export default function LandingPage() {
                 <View className="max-w-4xl mx-auto text-center">
                     <Text className="text-2xl font-bold text-stone-900 mb-4">Más de 100 restaurantes confían en Kiitos</Text>
                     <Text className="text-stone-500 text-lg">
-                        Únete a la comunidad de restaurantes que han modernizado su operación
+                        Únete a la comunidad de restaurantes que han modernizado su operaciónes
                     </Text>
                 </View>
             </View>
