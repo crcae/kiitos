@@ -16,6 +16,8 @@ import { uploadImage } from '../../../src/services/storage';
 import { Product, Category, ProductModifier } from '../../../src/types/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
+import QRCode from 'react-native-qrcode-svg';
+import { useRouter } from 'expo-router';
 
 // Helper component for Tab Button
 const TabButton = ({ title, active, onPress }: { title: string; active: boolean; onPress: () => void }) => (
@@ -28,6 +30,7 @@ const TabButton = ({ title, active, onPress }: { title: string; active: boolean;
 );
 
 export default function MenuManagementScreen() {
+    const router = useRouter();
     const insets = useSafeAreaInsets();
     // Removed activeTab since we show both
     const [categories, setCategories] = useState<Category[]>([]);
@@ -39,6 +42,8 @@ export default function MenuManagementScreen() {
     const [categoryModalVisible, setCategoryModalVisible] = useState(false);
     const [productModalVisible, setProductModalVisible] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [enableTakeout, setEnableTakeout] = useState(false);
+    const [qrModalVisible, setQrModalVisible] = useState(false);
 
     // Form State
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -67,9 +72,8 @@ export default function MenuManagementScreen() {
 
         const unsubscribeConfig = subscribeToRestaurantConfig('kiitos-main', (config) => {
             setAllowGuestOrdering(config.allow_guest_ordering ?? false);
+            setEnableTakeout(config.enable_takeout ?? false);
         });
-
-        // TODO: Load config for allowGuestOrdering
 
         return () => {
             unsubscribeCategories();
@@ -265,9 +269,19 @@ export default function MenuManagementScreen() {
         }
     };
 
-    // --- Renders ---
+    const toggleTakeout = async (val: boolean) => {
+        setEnableTakeout(val);
+        try {
+            await updateRestaurantConfig('kiitos-main', { enable_takeout: val });
+        } catch (e) {
+            console.error(e);
+            Alert.alert('Error', 'Failed to update config');
+            setEnableTakeout(!val); // Revert
+        }
+    };
 
-    // Filter products for the right column
+    // ...
+
     const filteredProducts = selectedCategoryId
         ? products.filter(p => p.category_id === selectedCategoryId)
         : [];
@@ -277,22 +291,101 @@ export default function MenuManagementScreen() {
 
 
             {/* Header / Settings Bar */}
-            <View className="px-6 py-4 border-b border-slate-800 flex-row justify-between items-center bg-slate-900 border-t border-t-slate-800">
-                <Text className="text-xl font-bold text-white">Menu Manager</Text>
+            <View className="px-6 py-4 border-b border-slate-800 bg-slate-900">
+                <View className="flex-row justify-between items-center mb-4">
+                    <Text className="text-xl font-bold text-white">Menu Manager</Text>
 
-                <View className="flex-row items-center space-x-3 bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
-                    <Text className={`font-medium ${allowGuestOrdering ? 'text-green-400' : 'text-slate-400'}`}>
-                        {allowGuestOrdering ? 'Guest Ordering ON' : 'Guest Ordering OFF'}
-                    </Text>
-                    <Switch
-                        trackColor={{ false: "#334155", true: "#059669" }} // Slate-700 / Emerald-600
-                        thumbColor={allowGuestOrdering ? "#ffffff" : "#cbd5e1"} // White / Slate-300
-                        ios_backgroundColor="#334155"
-                        onValueChange={toggleGuestOrdering}
-                        value={allowGuestOrdering}
-                    />
+                    {/* Preview Buttons */}
+                    <View className="flex-row gap-2">
+                        <TouchableOpacity
+                            className="bg-slate-800 p-2 rounded-lg border border-slate-700 flex-row items-center"
+                            onPress={() => {
+                                // Navigate to the table preview
+                                // Assuming 'table-1' or a generic preview route
+                                router.push('/menu/kiitos-main/table-1');
+                            }}
+                        >
+                            <View className="mr-2"><Text>👁️</Text></View>
+                            <Text className="text-slate-300 text-xs font-bold">Mesa</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            className="bg-slate-800 p-2 rounded-lg border border-slate-700 flex-row items-center"
+                            onPress={() => {
+                                router.push('/takeout/kiitos-main');
+                            }}
+                        >
+                            <View className="mr-2"><Text>👁️</Text></View>
+                            <Text className="text-slate-300 text-xs font-bold">Takeout</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+
+                {/* Toggles Row */}
+                <View className="flex-row flex-wrap gap-4">
+                    {/* Guest Ordering Toggle */}
+                    <View className="flex-row items-center space-x-3 bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
+                        <Text className={`font-medium ${allowGuestOrdering ? 'text-green-400' : 'text-slate-400'}`}>
+                            {allowGuestOrdering ? 'Guest Ordering ON' : 'Guest Ordering OFF'}
+                        </Text>
+                        <Switch
+                            trackColor={{ false: "#334155", true: "#059669" }}
+                            thumbColor={allowGuestOrdering ? "#ffffff" : "#cbd5e1"}
+                            ios_backgroundColor="#334155"
+                            onValueChange={toggleGuestOrdering}
+                            value={allowGuestOrdering}
+                        />
+                    </View>
+
+                    {/* Takeout Module Toggle */}
+                    <View className="flex-row items-center space-x-3 bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
+                        <Text className={`font-medium ${enableTakeout ? 'text-orange-400' : 'text-slate-400'}`}>
+                            {enableTakeout ? 'Takeout ON' : 'Takeout OFF'}
+                        </Text>
+                        <Switch
+                            trackColor={{ false: "#334155", true: "#ea580c" }} // Slate / Orange
+                            thumbColor={enableTakeout ? "#ffffff" : "#cbd5e1"}
+                            ios_backgroundColor="#334155"
+                            onValueChange={toggleTakeout}
+                            value={enableTakeout}
+                        />
+                    </View>
+
+                    {/* QR Button */}
+                    {enableTakeout && (
+                        <TouchableOpacity
+                            onPress={() => setQrModalVisible(true)}
+                            className="bg-orange-600 px-4 py-2 rounded-full"
+                        >
+                            <Text className="text-white font-bold text-xs">Ver QR Takeout</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
+
+            {/* QR Code Modal */}
+            <Modal visible={qrModalVisible} transparent animationType="fade">
+                <View className="flex-1 justify-center items-center bg-black/80 p-4">
+                    <View className="bg-white p-6 rounded-2xl items-center w-full max-w-sm">
+                        <Text className="text-xl font-bold mb-2 text-stone-900">QR de Takeout</Text>
+                        <Text className="text-stone-500 text-sm mb-6 text-center">Escanea para abrir el menú de pedidos para llevar</Text>
+
+                        {/* QR Placeholder - In real app use react-native-qrcode-svg */}
+                        <View className="w-64 h-64 bg-white items-center justify-center rounded-xl mb-6 overflow-hidden">
+                            <QRCode
+                                value="https://kiitos.app/takeout/kiitos-main"
+                                size={250}
+                            />
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={() => setQrModalVisible(false)}
+                            className="bg-stone-900 w-full py-3 rounded-xl"
+                        >
+                            <Text className="text-white text-center font-bold">Cerrar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             {/* Two Column Layout */}
             <View className="flex-1 flex-col md:flex-row">
