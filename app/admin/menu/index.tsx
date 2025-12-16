@@ -11,6 +11,7 @@ import {
     getCategories, createCategory, updateCategory, deleteCategory,
     subscribeToCategories, subscribeToProducts, subscribeToRestaurantConfig, updateRestaurantConfig
 } from '../../../src/services/menu';
+import BrandingColorPicker from '../../../src/components/BrandingColorPicker';
 import { RestaurantSettings } from '../../../src/types/firestore';
 import { uploadImage } from '../../../src/services/storage';
 import { Product, Category, ProductModifier } from '../../../src/types/firestore';
@@ -43,7 +44,13 @@ export default function MenuManagementScreen() {
     const [productModalVisible, setProductModalVisible] = useState(false);
     const [uploading, setUploading] = useState(false);
     const [enableTakeout, setEnableTakeout] = useState(false);
+
     const [qrModalVisible, setQrModalVisible] = useState(false);
+    const [brandingModalVisible, setBrandingModalVisible] = useState(false);
+
+    // Branding State
+    const [brandingLogo, setBrandingLogo] = useState<string | null>(null);
+    const [brandingColor, setBrandingColor] = useState('#F97316'); // Default Orange
 
     // Form State
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -73,6 +80,10 @@ export default function MenuManagementScreen() {
         const unsubscribeConfig = subscribeToRestaurantConfig('kiitos-main', (config) => {
             setAllowGuestOrdering(config.allow_guest_ordering ?? false);
             setEnableTakeout(config.enable_takeout ?? false);
+            if (config.branding) {
+                setBrandingLogo(config.branding.logo_url || null);
+                setBrandingColor(config.branding.primary_color || '#F97316');
+            }
         });
 
         return () => {
@@ -280,6 +291,40 @@ export default function MenuManagementScreen() {
         }
     };
 
+    const handleSaveBranding = async () => {
+        try {
+            setUploading(true);
+            let logoUrl = brandingLogo;
+
+            // Check if it's a new local image (starts with file:// or similar, not http)
+            if (brandingLogo && !brandingLogo.startsWith('http')) {
+                try {
+                    const filename = `branding/logo_${Date.now()}.jpg`;
+                    logoUrl = await uploadImage(brandingLogo, `restaurants/kiitos-main/${filename}`);
+                } catch (uploadError: any) {
+                    console.error("Upload failed", uploadError);
+                    Alert.alert('Error', 'No se pudo subir el logo. Inténtalo de nuevo.');
+                    setUploading(false);
+                    return;
+                }
+            }
+
+            const brandingData = {
+                logo_url: logoUrl || undefined,
+                primary_color: brandingColor,
+            };
+
+            await updateRestaurantConfig('kiitos-main', { branding: brandingData });
+            setBrandingModalVisible(false);
+            Alert.alert('Éxito', 'Configuración de marca actualizada');
+        } catch (e: any) {
+            console.error(e);
+            Alert.alert('Error', 'Failed to save branding: ' + e.message);
+        } finally {
+            setUploading(false);
+        }
+    };
+
     // ...
 
     const filteredProducts = selectedCategoryId
@@ -307,6 +352,13 @@ export default function MenuManagementScreen() {
                         >
                             <View className="mr-2"><Text>👁️</Text></View>
                             <Text className="text-slate-300 text-xs font-bold">Mesa</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            className="bg-slate-800 p-2 rounded-lg border border-slate-700 flex-row items-center"
+                            onPress={() => setBrandingModalVisible(true)}
+                        >
+                            <View className="mr-2"><Text>🎨</Text></View>
+                            <Text className="text-slate-300 text-xs font-bold">Marca</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             className="bg-slate-800 p-2 rounded-lg border border-slate-700 flex-row items-center"
@@ -637,6 +689,107 @@ export default function MenuManagementScreen() {
                                         <Text className="text-white font-medium">{uploading ? 'Uploading...' : 'Save'}</Text>
                                     </TouchableOpacity>
                                 </View>
+                            </View>
+                        </KeyboardAvoidingView>
+                    </TouchableWithoutFeedback>
+                )}
+            </Modal>
+
+            {/* Branding Modal */}
+            <Modal visible={brandingModalVisible} transparent animationType="fade">
+                {Platform.OS === 'web' ? (
+                    <View className="flex-1 justify-center items-center bg-black/60 px-4">
+                        <View className="bg-white w-full max-w-sm rounded-2xl overflow-hidden max-h-[90%]">
+                            <ScrollView contentContainerStyle={{ padding: 24 }}>
+                                <Text className="text-xl font-bold mb-4 text-slate-900">Personalizar Marca</Text>
+
+                                <Text className="text-sm font-medium text-slate-700 mb-2">Logo del Restaurante</Text>
+                                <TouchableOpacity onPress={() => pickImage(setBrandingLogo)} className="mb-6 items-center justify-center h-32 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 overflow-hidden">
+                                    {brandingLogo ? (
+                                        <Image source={{ uri: brandingLogo }} className="w-full h-full" resizeMode="contain" />
+                                    ) : (
+                                        <View className="items-center">
+                                            <Text className="text-2xl mb-1">📷</Text>
+                                            <Text className="text-slate-500">Subir Logo</Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+
+                                <Text className="text-sm font-medium text-slate-700 mb-2">Color Primario</Text>
+                                <View className="mb-6">
+                                    <BrandingColorPicker
+                                        value={brandingColor}
+                                        onComplete={(color) => setBrandingColor(color)}
+                                    />
+                                </View>
+
+                                <View className="flex-row items-center mb-6">
+                                    <Text className="text-slate-500 mr-4">Vista Previa:</Text>
+                                    <View
+                                        style={{ backgroundColor: brandingColor, width: 40, height: 40, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}
+                                    />
+                                    <View className="ml-4 px-3 py-2 rounded-lg" style={{ backgroundColor: brandingColor }}>
+                                        <Text className="text-white font-bold text-xs">Botón</Text>
+                                    </View>
+                                </View>
+
+                                <View className="flex-row justify-end space-x-2">
+                                    <TouchableOpacity onPress={() => setBrandingModalVisible(false)} className="px-4 py-2">
+                                        <Text className="text-slate-500 font-medium">Cancelar</Text>
+                                    </TouchableOpacity>
+                                    <TouchableOpacity onPress={handleSaveBranding} disabled={uploading} className="bg-indigo-600 px-4 py-2 rounded-lg">
+                                        <Text className="text-white font-medium">{uploading ? 'Guardando...' : 'Guardar'}</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            </ScrollView>
+                        </View>
+                    </View>
+                ) : (
+                    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 justify-center items-center bg-black/60 px-4">
+                            <View className="bg-white w-full max-w-sm rounded-2xl overflow-hidden max-h-[80%]">
+                                <ScrollView contentContainerStyle={{ padding: 24 }}>
+                                    <Text className="text-xl font-bold mb-4 text-slate-900">Personalizar Marca</Text>
+
+                                    <Text className="text-sm font-medium text-slate-700 mb-2">Logo del Restaurante</Text>
+                                    <TouchableOpacity onPress={() => pickImage(setBrandingLogo)} className="mb-6 items-center justify-center h-32 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 overflow-hidden">
+                                        {brandingLogo ? (
+                                            <Image source={{ uri: brandingLogo }} className="w-full h-full" resizeMode="contain" />
+                                        ) : (
+                                            <View className="items-center">
+                                                <Text className="text-2xl mb-1">📷</Text>
+                                                <Text className="text-slate-500">Subir Logo</Text>
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
+
+                                    <Text className="text-sm font-medium text-slate-700 mb-2">Color Primario</Text>
+                                    <View className="mb-6">
+                                        <BrandingColorPicker
+                                            value={brandingColor}
+                                            onComplete={(color) => setBrandingColor(color)}
+                                        />
+                                    </View>
+
+                                    <View className="flex-row items-center mb-6">
+                                        <Text className="text-slate-500 mr-4">Vista Previa:</Text>
+                                        <View
+                                            style={{ backgroundColor: brandingColor, width: 40, height: 40, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}
+                                        />
+                                        <View className="ml-4 px-3 py-2 rounded-lg" style={{ backgroundColor: brandingColor }}>
+                                            <Text className="text-white font-bold text-xs">Botón</Text>
+                                        </View>
+                                    </View>
+
+                                    <View className="flex-row justify-end space-x-2">
+                                        <TouchableOpacity onPress={() => setBrandingModalVisible(false)} className="px-4 py-2">
+                                            <Text className="text-slate-500 font-medium">Cancelar</Text>
+                                        </TouchableOpacity>
+                                        <TouchableOpacity onPress={handleSaveBranding} disabled={uploading} className="bg-indigo-600 px-4 py-2 rounded-lg">
+                                            <Text className="text-white font-medium">{uploading ? 'Guardando...' : 'Guardar'}</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </ScrollView>
                             </View>
                         </KeyboardAvoidingView>
                     </TouchableWithoutFeedback>

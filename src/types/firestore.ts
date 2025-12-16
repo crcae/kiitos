@@ -63,6 +63,13 @@ export interface RestaurantSettings {
     serviceCharge?: number; // Optional service charge percentage
     allow_guest_ordering?: boolean; // Whether guests can order via digital menu
     enable_takeout?: boolean;
+    branding?: {
+        logo_url?: string;
+        cover_image_url?: string;
+        primary_color?: string;
+        accent_color?: string;
+        font_style?: 'modern' | 'serif' | 'mono';
+    };
 }
 
 export interface Subscription {

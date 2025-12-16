@@ -17,6 +17,7 @@ export default function TakeoutMenuScreen() {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [orderingEnabled, setOrderingEnabled] = useState(false);
+    const [branding, setBranding] = useState<RestaurantSettings['branding']>(undefined);
 
     useEffect(() => {
         if (!restaurantId) return;
@@ -36,9 +37,10 @@ export default function TakeoutMenuScreen() {
         // Subscribe to products
         const unsubProducts = subscribeToGuestProducts(restaurantId, setProducts);
 
-        // Subscribe to restaurant config (for takeout toggle)
+        // Subscribe to restaurant config (for takeout toggle & branding)
         const unsubConfig = subscribeToRestaurantConfig(restaurantId, (config: RestaurantSettings) => {
             setOrderingEnabled(config.enable_takeout ?? false);
+            setBranding(config.branding);
         });
 
         return () => {
@@ -69,8 +71,16 @@ export default function TakeoutMenuScreen() {
     return (
         <View className="flex-1 bg-stone-50">
             {/* Header */}
-            <View className="bg-white border-b border-stone-200 px-4 py-4 pt-12">
-                <Text className="text-2xl font-bold text-stone-900">Menú para Llevar</Text>
+            <View className="bg-white border-b border-stone-200 px-4 py-4 pt-12 items-center">
+                {branding?.logo_url ? (
+                    <Image
+                        source={{ uri: branding.logo_url }}
+                        className="h-12 w-48"
+                        resizeMode="contain"
+                    />
+                ) : (
+                    <Text className="text-2xl font-bold text-stone-900">Menú para Llevar</Text>
+                )}
                 <Text className="text-sm text-stone-600 mt-1">Selecciona tus productos favoritos</Text>
             </View>
 
@@ -98,10 +108,8 @@ export default function TakeoutMenuScreen() {
                         <TouchableOpacity
                             key={category.id}
                             onPress={() => setSelectedCategory(category.id)}
-                            className={`px-4 py-2 rounded-full ${selectedCategory === category.id
-                                ? 'bg-orange-600'
-                                : 'bg-stone-100'
-                                }`}
+                            className={`px-4 py-2 rounded-full mr-2 ${selectedCategory !== category.id ? 'bg-stone-100' : ''}`}
+                            style={selectedCategory === category.id ? { backgroundColor: branding?.primary_color || '#EA580C' } : {}}
                         >
                             <Text className={`font-medium ${selectedCategory === category.id
                                 ? 'text-white'
@@ -138,13 +146,14 @@ export default function TakeoutMenuScreen() {
                                         {product.description}
                                     </Text>
                                 )}
-                                <Text className="text-lg font-bold text-orange-600 mt-2">
+                                <Text className="text-lg font-bold mt-2" style={{ color: branding?.primary_color || '#EA580C' }}>
                                     ${product.price.toFixed(2)}
                                 </Text>
                                 <TouchableOpacity
                                     onPress={() => handleAddToCart(product)}
                                     disabled={!orderingEnabled}
-                                    className={`rounded-lg py-2 mt-3 flex-row items-center justify-center ${orderingEnabled ? 'bg-orange-600' : 'bg-stone-300'}`}
+                                    className={`rounded-lg py-2 mt-3 flex-row items-center justify-center ${!orderingEnabled ? 'bg-stone-300' : ''}`}
+                                    style={orderingEnabled ? { backgroundColor: branding?.primary_color || '#EA580C' } : {}}
                                 >
                                     {orderingEnabled ? (
                                         <>
@@ -173,7 +182,8 @@ export default function TakeoutMenuScreen() {
             {cartItemCount > 0 && (
                 <TouchableOpacity
                     onPress={() => router.push('/takeout/checkout')}
-                    className="absolute bottom-8 right-4 bg-orange-600 rounded-full px-6 py-4 flex-row items-center shadow-lg"
+                    className="absolute bottom-8 right-4 rounded-full px-6 py-4 flex-row items-center shadow-lg"
+                    style={{ backgroundColor: branding?.primary_color || '#EA580C' }}
                 >
                     <ShoppingCart size={24} color="white" />
                     <Text className="text-white font-bold text-lg ml-2">{cartItemCount}</Text>
