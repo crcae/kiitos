@@ -6,7 +6,7 @@ import { ShoppingBag, ChevronLeft, Plus, Minus, FileText, Utensils, CheckCircle 
 import { colors } from '../../../src/styles/theme';
 import { subscribeToGuestCategories, subscribeToGuestProducts, getTableDetails, sendOrderToKitchen, subscribeToActiveSession } from '../../../src/services/guestMenu';
 import { subscribeToRestaurantConfig } from '../../../src/services/menu';
-import { Category, Product, Table, OrderItem } from '../../../src/types/firestore';
+import { Category, Product, Table, OrderItem, RestaurantSettings } from '../../../src/types/firestore';
 
 interface CartItem {
     product: Product;
@@ -24,6 +24,7 @@ export default function DigitalMenuScreen() {
     const [table, setTable] = useState<Table | null>(null);
     const [allowOrdering, setAllowOrdering] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [branding, setBranding] = useState<RestaurantSettings['branding']>(undefined);
 
     // UI State
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -57,6 +58,7 @@ export default function DigitalMenuScreen() {
 
                 const unsubConfig = subscribeToRestaurantConfig(restaurantId, (config) => {
                     setAllowOrdering(config.allow_guest_ordering ?? false);
+                    setBranding(config.branding);
                 });
 
                 // Subscribe to Active Session for "Bill" tab
@@ -178,22 +180,34 @@ export default function DigitalMenuScreen() {
             {/* Header */}
             <View className="px-5 py-4 flex-row justify-between items-center bg-white border-b border-gray-100">
                 <View>
-                    <Text className="text-sm font-bold text-gray-400 uppercase tracking-widest">MENU</Text>
-                    <Text className="text-2xl font-extrabold text-gray-900">{table?.name || 'Table'}</Text>
+                    {branding?.logo_url ? (
+                        <Image
+                            source={{ uri: branding.logo_url }}
+                            className="h-10 w-32"
+                            resizeMode="contain"
+                        />
+                    ) : (
+                        <>
+                            <Text className="text-sm font-bold text-gray-400 uppercase tracking-widest">MENU</Text>
+                            <Text className="text-2xl font-extrabold text-gray-900">{table?.name || 'Table'}</Text>
+                        </>
+                    )}
                 </View>
                 {/* Tabs */}
                 <View className="flex-row bg-gray-100 p-1 rounded-xl">
                     <TouchableOpacity
                         onPress={() => setActiveTab('menu')}
                         className={`px-4 py-2 rounded-lg ${activeTab === 'menu' ? 'bg-white shadow-sm' : ''}`}
+                        style={activeTab === 'menu' && branding?.primary_color ? { borderBottomWidth: 2, borderBottomColor: branding.primary_color } : {}}
                     >
-                        <Utensils size={18} color={activeTab === 'menu' ? 'black' : 'gray'} />
+                        <Utensils size={18} color={activeTab === 'menu' && branding?.primary_color ? branding.primary_color : (activeTab === 'menu' ? 'black' : 'gray')} />
                     </TouchableOpacity>
                     <TouchableOpacity
                         onPress={() => setActiveTab('bill')}
                         className={`px-4 py-2 rounded-lg ${activeTab === 'bill' ? 'bg-white shadow-sm' : ''}`}
+                        style={activeTab === 'bill' && branding?.primary_color ? { borderBottomWidth: 2, borderBottomColor: branding.primary_color } : {}}
                     >
-                        <FileText size={18} color={activeTab === 'bill' ? 'black' : 'gray'} />
+                        <FileText size={18} color={activeTab === 'bill' && branding?.primary_color ? branding.primary_color : (activeTab === 'bill' ? 'black' : 'gray')} />
                     </TouchableOpacity>
                 </View>
             </View>
@@ -209,6 +223,7 @@ export default function DigitalMenuScreen() {
                                     key={cat.id}
                                     onPress={() => setSelectedCategory(cat.id)}
                                     className={`px-5 py-2 rounded-full border ${selectedCategory === cat.id ? 'bg-black border-black' : 'bg-white border-gray-200'}`}
+                                    style={selectedCategory === cat.id && branding?.primary_color ? { backgroundColor: branding.primary_color, borderColor: branding.primary_color } : {}}
                                 >
                                     <Text className={`font-semibold ${selectedCategory === cat.id ? 'text-white' : 'text-gray-700'}`}>
                                         {cat.name}
@@ -247,7 +262,7 @@ export default function DigitalMenuScreen() {
                                     </View>
 
                                     <View className="flex-row justify-between items-center mt-3">
-                                        <Text className="text-base font-semibold text-gray-900">${item.price.toFixed(2)}</Text>
+                                        <Text className="text-base font-semibold text-gray-900" style={branding?.primary_color ? { color: branding.primary_color } : {}}>${item.price.toFixed(2)}</Text>
 
                                         {allowOrdering && (
                                             getQuantity(item.id) === 0 ? (
@@ -258,7 +273,7 @@ export default function DigitalMenuScreen() {
                                                     <Plus size={20} color="black" />
                                                 </TouchableOpacity>
                                             ) : (
-                                                <View className="flex-row items-center bg-black rounded-full px-1">
+                                                <View className="flex-row items-center bg-black rounded-full px-1" style={branding?.primary_color ? { backgroundColor: branding.primary_color } : {}}>
                                                     <TouchableOpacity onPress={() => removeFromCart(item.id)} className="w-8 h-8 items-center justify-center">
                                                         <Minus size={16} color="white" />
                                                     </TouchableOpacity>
@@ -281,6 +296,7 @@ export default function DigitalMenuScreen() {
                             <TouchableOpacity
                                 onPress={handleSendOrder}
                                 className="bg-black py-4 px-6 rounded-2xl flex-row justify-between items-center shadow-lg"
+                                style={branding?.primary_color ? { backgroundColor: branding.primary_color } : {}}
                             >
                                 <View className="flex-row items-center">
                                     <View className="bg-white/20 px-2 py-1 rounded text-xs mr-3">
@@ -337,6 +353,7 @@ export default function DigitalMenuScreen() {
                                 <TouchableOpacity
                                     onPress={handlePayBill}
                                     className="bg-black py-4 rounded-2xl items-center shadow-lg"
+                                    style={branding?.primary_color ? { backgroundColor: branding.primary_color } : {}}
                                 >
                                     <Text className="font-bold text-white text-lg">Pay Bill</Text>
                                 </TouchableOpacity>
