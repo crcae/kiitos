@@ -6,7 +6,9 @@ import QRCode from 'react-native-qrcode-svg';
 import AirbnbButton from '../../../src/components/AirbnbButton';
 import AirbnbInput from '../../../src/components/AirbnbInput';
 import { colors } from '../../../src/styles/theme';
-import { Table } from '../../../src/types/firestore';
+import QRCodeModal from '../../../src/components/QRCodeModal';
+import { subscribeToRestaurantConfig } from '../../../src/services/menu';
+import { Table, RestaurantSettings } from '../../../src/types/firestore';
 import { subscribeToTables, createTable, deleteTable } from '../../../src/services/tables';
 
 const RESTAURANT_ID = 'kiitos-main';
@@ -18,10 +20,16 @@ export default function TablesManagementScreen() {
     const [qrModalVisible, setQrModalVisible] = useState(false);
     const [tableName, setTableName] = useState('');
     const [selectedTable, setSelectedTable] = useState<Table | null>(null);
+    const [restaurantConfig, setRestaurantConfig] = useState<RestaurantSettings | null>(null);
 
     useEffect(() => {
-        const unsubscribe = subscribeToTables(RESTAURANT_ID, setTables);
-        return () => unsubscribe();
+        const unsubscribeTables = subscribeToTables(RESTAURANT_ID, setTables);
+        const unsubscribeConfig = subscribeToRestaurantConfig(RESTAURANT_ID, setRestaurantConfig);
+
+        return () => {
+            unsubscribeTables();
+            unsubscribeConfig();
+        };
     }, []);
 
     const handleCreateTable = async () => {
@@ -138,22 +146,14 @@ export default function TablesManagementScreen() {
                 )}
             </Modal>
 
-            {/* QR Modal */}
-            <Modal visible={qrModalVisible} transparent animationType="fade">
-                <View className="flex-1 justify-center items-center bg-black/80 px-4">
-                    <View className="bg-white p-8 rounded-2xl items-center">
-                        {selectedTable && (
-                            <>
-                                <View className="border-4 border-black p-4 rounded-xl mb-4">
-                                    <QRCode value={getQrValue(selectedTable.id)} size={200} />
-                                </View>
-                                <Text className="text-2xl font-bold text-slate-900 mb-6">{selectedTable.name}</Text>
-                                <AirbnbButton title="Close" onPress={() => setQrModalVisible(false)} variant="outline" size="sm" fullWidth={false} />
-                            </>
-                        )}
-                    </View>
-                </View>
-            </Modal>
+            {/* QR Modal Component */}
+            <QRCodeModal
+                visible={qrModalVisible}
+                onClose={() => setQrModalVisible(false)}
+                table={selectedTable}
+                restaurantConfig={restaurantConfig}
+                restaurantId={RESTAURANT_ID}
+            />
         </View>
     );
 }
