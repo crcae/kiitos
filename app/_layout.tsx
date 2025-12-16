@@ -9,6 +9,7 @@ import { BillProvider } from '../src/context/BillContext';
 import { GuestProvider } from '../src/context/GuestContext';
 import { AuthProvider } from '../src/context/AuthContext';
 import { TenantProvider } from '../src/context/TenantContext';
+import { TakeoutCartProvider } from '../src/context/TakeoutCartContext';
 import '../global.css';
 
 export default function Layout() {
@@ -37,8 +38,10 @@ export default function Layout() {
                 <TenantProvider>
                     <GuestProvider>
                         <BillProvider>
-                            <Stack screenOptions={{ headerShown: false }} />
-                            <StatusBar style="auto" />
+                            <TakeoutCartProvider>
+                                <Stack screenOptions={{ headerShown: false }} />
+                                <StatusBar style="auto" />
+                            </TakeoutCartProvider>
                         </BillProvider>
                     </GuestProvider>
                 </TenantProvider>

@@ -62,6 +62,7 @@ export interface RestaurantSettings {
     taxRate: number; // Percentage (e.g., 16 for 16%)
     serviceCharge?: number; // Optional service charge percentage
     allow_guest_ordering?: boolean; // Whether guests can order via digital menu
+    enable_takeout?: boolean;
 }
 
 export interface Subscription {
@@ -212,6 +213,17 @@ export interface RestaurantConfig {
     timezone?: string; // Optional as it might be in settings
     tax_rate: number;
     allow_guest_ordering: boolean;
+    enable_takeout?: boolean; // New switch for takeout module
+    preparation_time_minutes?: number; // Default prep time for ASAP orders
+    opening_hours?: {
+        mon?: { open: string; close: string }; // Format: "09:00", "22:00"
+        tue?: { open: string; close: string };
+        wed?: { open: string; close: string };
+        thu?: { open: string; close: string };
+        fri?: { open: string; close: string };
+        sat?: { open: string; close: string };
+        sun?: { open: string; close: string };
+    };
 }
 
 export interface Category {
@@ -287,5 +299,45 @@ export interface Payment {
     createdBy?: string; // Waiter ID, guest ID, or other identifier
     notes?: string;
     items?: PaymentItem[]; // Item-level breakdown for "pay by item" mode
+}
+
+// ============================================
+// PICKUP/TAKEOUT ORDERS
+// ============================================
+
+export type PickupOrderStatus = 'scheduled' | 'preparing' | 'ready' | 'completed' | 'cancelled';
+export type PickupTimeOption = 'asap' | 'scheduled';
+export type DiningOption = 'takeout' | 'eat_in';
+
+export interface PickupOrderItem {
+    product_id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    modifiers?: ProductModifier[];
+}
+
+export interface PickupOrder {
+    id: string;
+    restaurantId: string;
+    pickup_code: string; // 6-character unique code (e.g., "KII-9X2")
+    dining_option?: DiningOption; // 'takeout' or 'eat_in'
+    customer_name?: string;
+    customer_phone?: string;
+    customer_email?: string;
+
+    items: PickupOrderItem[];
+    subtotal: number;
+    tax: number;
+    total: number;
+
+    time_option: PickupTimeOption;
+    scheduled_time: Timestamp; // When customer wants to pick up
+    created_at: Timestamp;
+
+    status: PickupOrderStatus;
+    payment_intent_id?: string; // Stripe payment reference
+
+    notes?: string;
 }
 
