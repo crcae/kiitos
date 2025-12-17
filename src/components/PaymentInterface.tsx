@@ -96,6 +96,15 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         return expanded;
     }, [session, session?.items, session?.items?.length, session?.amount_paid]);
 
+    // Calculate actual total including modifiers
+    const calculatedTotal = useMemo(() => {
+        if (!session) return 0;
+        return session.items.reduce((sum, item) => {
+            const modifiersTotal = item.modifiers?.reduce((mSum, mod) => mSum + mod.price, 0) || 0;
+            return sum + ((item.price + modifiersTotal) * item.quantity);
+        }, 0);
+    }, [session?.items]);
+
     const toggleItemSelection = (virtualId: string) => {
         const newSelection = new Set(selectedVirtualIds);
         if (newSelection.has(virtualId)) {
@@ -131,7 +140,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
 
     const calculateAmount = (): number => {
         if (!session) return 0;
-        const remaining = session.remaining_amount || (session.total - (session.amount_paid || 0));
+        const remaining = calculatedTotal - (session.amount_paid || 0);
 
         switch (splitMode) {
             case 'full':
@@ -167,7 +176,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         const amount = calculateAmount();
         const tip = calculateTip();
         const totalWithTip = amount + tip;
-        const remaining = session.remaining_amount || (session.total - (session.amount_paid || 0));
+        const remaining = calculatedTotal - (session.amount_paid || 0);
 
         // CRITICAL: Validate ONLY the bill amount (without tip) against remaining
         if (amount > remaining + 0.01) {
@@ -301,7 +310,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         );
     }
 
-    const remaining = session.remaining_amount || (session.total - (session.amount_paid || 0));
+    const remaining = calculatedTotal - (session.amount_paid || 0);
 
     if (remaining <= 0) {
         return (
@@ -316,7 +325,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                         <Text style={styles.receiptSectionTitle}>Resumen de Cuenta</Text>
                         <View style={styles.receiptRow}>
                             <Text style={styles.receiptLabel}>Subtotal:</Text>
-                            <Text style={styles.receiptValue}>${session.subtotal?.toFixed(2) || session.total.toFixed(2)}</Text>
+                            <Text style={styles.receiptValue}>${session.subtotal?.toFixed(2) || calculatedTotal.toFixed(2)}</Text>
                         </View>
                         {session.tax > 0 && (
                             <View style={styles.receiptRow}>
@@ -326,7 +335,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                         )}
                         <View style={[styles.receiptRow, styles.receiptTotalRow]}>
                             <Text style={styles.receiptTotalLabel}>Total:</Text>
-                            <Text style={styles.receiptTotalValue}>${session.total.toFixed(2)}</Text>
+                            <Text style={styles.receiptTotalValue}>${calculatedTotal.toFixed(2)}</Text>
                         </View>
                     </View>
 
@@ -414,28 +423,39 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
 
                 {session.items.map((item, idx) => {
                     const isWaiter = item.created_by === 'waiter' || item.created_by_id?.startsWith('waiter');
-                    const creatorLabel = isWaiter ? 'Mesero' : 'Cliente';
+                    const creatorLabel = isWaiter ? 'Mesero' : (item.created_by_name || 'Cliente');
 
                     return (
                         <View key={`${item.id}_${idx}`} style={styles.orderSummaryRow}>
                             <View style={styles.orderSummaryInfo}>
-                                <Text style={styles.orderSummaryName}>
-                                    {item.quantity}x {item.name}
-                                </Text>
-                                <View style={[
-                                    styles.creatorBadge,
-                                    isWaiter ? styles.creatorBadgeWaiter : styles.creatorBadgeGuest
-                                ]}>
-                                    <Text style={[
-                                        styles.creatorText,
-                                        isWaiter ? styles.creatorTextWaiter : styles.creatorTextGuest
-                                    ]}>
-                                        {creatorLabel}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                    <Text style={styles.orderSummaryName}>
+                                        {item.quantity}x {item.name}
                                     </Text>
+                                    <View style={[
+                                        styles.creatorBadge,
+                                        isWaiter ? styles.creatorBadgeWaiter : styles.creatorBadgeGuest
+                                    ]}>
+                                        <Text style={[
+                                            styles.creatorText,
+                                            isWaiter ? styles.creatorTextWaiter : styles.creatorTextGuest
+                                        ]}>
+                                            {creatorLabel}
+                                        </Text>
+                                    </View>
                                 </View>
+                                {item.modifiers && item.modifiers.length > 0 && (
+                                    <View style={{ marginTop: 4 }}>
+                                        {item.modifiers.map((mod, mIdx) => (
+                                            <Text key={mIdx} style={{ fontSize: 12, color: '#666' }}>
+                                                + {mod.name} {mod.price > 0 ? `($${mod.price.toFixed(2)})` : ''}
+                                            </Text>
+                                        ))}
+                                    </View>
+                                )}
                             </View>
                             <Text style={styles.orderSummaryPrice}>
-                                ${(item.price * item.quantity).toFixed(2)}
+                                ${((item.price + (item.modifiers?.reduce((sum, mod) => sum + mod.price, 0) || 0)) * item.quantity).toFixed(2)}
                             </Text>
                         </View>
                     );
@@ -447,7 +467,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                 <Text style={styles.sectionTitle}>Resumen de Pagos</Text>
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Total Original:</Text>
-                    <Text style={styles.summaryValue}>${session.total.toFixed(2)}</Text>
+                    <Text style={styles.summaryValue}>${calculatedTotal.toFixed(2)}</Text>
                 </View>
 
                 {payments.length > 0 && (
@@ -1235,9 +1255,7 @@ const styles = StyleSheet.create({
     },
     orderSummaryInfo: {
         flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        flexWrap: 'wrap',
+        flexDirection: 'column',
     },
     orderSummaryName: {
         fontSize: 15,
