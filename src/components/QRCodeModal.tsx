@@ -1,8 +1,8 @@
-import React, { useRef } from 'react';
-import { View, Text, Modal, TouchableOpacity, Platform, Image, StyleSheet, Dimensions } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, Modal, TouchableOpacity, Platform, Image, StyleSheet, Dimensions, Alert } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { Table, RestaurantSettings } from '../types/firestore';
-import { X, Printer } from 'lucide-react-native';
+import { X, Printer, Copy } from 'lucide-react-native';
 
 interface QRCodeModalProps {
     visible: boolean;
@@ -13,6 +13,8 @@ interface QRCodeModalProps {
 }
 
 export default function QRCodeModal({ visible, onClose, table, restaurantConfig, restaurantId }: QRCodeModalProps) {
+    const [copied, setCopied] = useState(false);
+
     if (!table || !visible) return null;
 
     const qrValue = Platform.OS === 'web'
@@ -22,6 +24,24 @@ export default function QRCodeModal({ visible, onClose, table, restaurantConfig,
     const branding = restaurantConfig?.branding;
     const primaryColor = branding?.primary_color || '#F97316';
     const logoUrl = branding?.logo_url;
+
+    const handleCopyUrl = async () => {
+        try {
+            if (Platform.OS === 'web') {
+                await navigator.clipboard.writeText(qrValue);
+                setCopied(true);
+                setTimeout(() => setCopied(false), 2000);
+            } else {
+                // For React Native, you'd use @react-native-clipboard/clipboard
+                // For now, show an alert with the URL
+                Alert.alert('URL del menú', qrValue, [
+                    { text: 'Cerrar', style: 'cancel' }
+                ]);
+            }
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo copiar la URL');
+        }
+    };
 
     const handlePrint = () => {
         if (Platform.OS === 'web') {
@@ -92,12 +112,22 @@ export default function QRCodeModal({ visible, onClose, table, restaurantConfig,
                     {/* Table Name */}
                     <Text style={[styles.tableName, { color: primaryColor }]}>{table.name}</Text>
 
-                    {/* QR Code */}
-                    <View style={[styles.qrContainer, { borderColor: primaryColor }]}>
+                    {/* QR Code - Clickable */}
+                    <TouchableOpacity
+                        onPress={handleCopyUrl}
+                        style={[styles.qrContainer, { borderColor: primaryColor }]}
+                        activeOpacity={0.7}
+                    >
                         <QRCode value={qrValue} size={200} />
-                    </View>
-
-                    <Text style={styles.helperText}>Escanea para ordenar</Text>
+                        {copied && (
+                            <View style={styles.copiedOverlay}>
+                                <View style={[styles.copiedBadge, { backgroundColor: primaryColor }]}>
+                                    <Copy size={16} color="white" />
+                                    <Text style={styles.copiedText}>¡Copiado!</Text>
+                                </View>
+                            </View>
+                        )}
+                    </TouchableOpacity>
 
                     {/* Actions (Hidden on Print) */}
                     <View style={[styles.actions, { display: 'flex' }]} className="no-print">
@@ -179,12 +209,51 @@ const styles = StyleSheet.create({
         borderRadius: 20,
         backgroundColor: 'white',
         marginBottom: 20,
+        position: 'relative',
+    },
+    copiedOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 16,
+    },
+    copiedBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 12,
+    },
+    copiedText: {
+        color: 'white',
+        fontWeight: '700',
+        fontSize: 16,
+    },
+    helperContainer: {
+        alignItems: 'center',
+        marginBottom: 24,
+        gap: 8,
     },
     helperText: {
         fontSize: 16,
         color: '#64748b',
         fontWeight: '500',
-        marginBottom: 24,
+    },
+    copyHint: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
+    copyHintText: {
+        fontSize: 12,
+        color: '#94a3b8',
+        fontWeight: '400',
     },
     actions: {
         width: '100%',
