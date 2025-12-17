@@ -132,6 +132,7 @@ export interface Table {
         y: number;
     };
     capacity?: number; // Number of seats
+    current_session_total?: number; // Snapshot of the current session total for dashboard display
 }
 
 // ============================================

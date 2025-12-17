@@ -1,18 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity } from 'react-native';
+import { LogOut } from 'lucide-react-native';
 import { subscribeToActiveSessions, markSessionPaid } from '../../src/services/sessions';
 import { Session } from '../../src/types/firestore';
 import AirbnbCard from '../../src/components/AirbnbCard';
 import AirbnbButton from '../../src/components/AirbnbButton';
 import { colors, spacing, typography } from '../../src/styles/theme';
+import { useAuth } from '../../src/context/AuthContext';
+import { useRestaurant } from '../../src/hooks/useRestaurant';
 
 export default function CashierStatusScreen() {
     const [sessions, setSessions] = useState<Session[]>([]);
+    const { signOut, user } = useAuth();
+    const { restaurant } = useRestaurant();
+    const restaurantId = user?.restaurantId || 'kiitos-main';
 
     useEffect(() => {
         const unsubscribe = subscribeToActiveSessions(setSessions);
         return () => unsubscribe();
     }, []);
+
+    const handleLogout = async () => {
+        try {
+            await signOut();
+        } catch (error) {
+            Alert.alert('Error', 'Failed to log out');
+        }
+    };
 
     const handlePayment = async (session: Session) => {
         Alert.alert(
@@ -61,6 +75,21 @@ export default function CashierStatusScreen() {
 
     return (
         <View style={styles.container}>
+            {/* Header with Branding */}
+            <View style={styles.header}>
+                <View>
+                    <Text style={styles.brandSubtitle}>
+                        {restaurant?.name || restaurant?.id || restaurantId || 'Loading...'}
+                    </Text>
+                    <Text style={styles.title}>Caja</Text>
+                </View>
+
+                <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+                    <LogOut size={20} color={colors.white} />
+                    <Text style={styles.logoutText}>Salir</Text>
+                </TouchableOpacity>
+            </View>
+
             <FlatList
                 data={sessions}
                 renderItem={renderSessionItem}
@@ -74,11 +103,49 @@ export default function CashierStatusScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: spacing.xl,
         backgroundColor: colors.oatCream,
+    },
+    header: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+        backgroundColor: '#FFFFFF',
+        marginBottom: spacing.lg,
+    },
+    brandSubtitle: {
+        fontSize: 12,
+        color: '#F97316', // Orange-500
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 2,
+    },
+    title: {
+        fontSize: 24,
+        fontWeight: 'bold',
+        color: '#1E293B',
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EF4444',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        gap: 6
+    },
+    logoutText: {
+        color: '#FFFFFF',
+        fontWeight: 'bold',
+        fontSize: 14
     },
     list: {
         gap: spacing.lg,
+        paddingHorizontal: 20, // Add padding to list since container doesn't have it anymore
     },
     card: {
         marginBottom: spacing.sm,

@@ -45,6 +45,30 @@ export const validatePinUnique = async (
     return snapshot.empty;
 };
 
+export const validateStaffPin = async (
+    restaurantId: string,
+    pin: string
+): Promise<StaffMember | null> => {
+    const q = query(
+        getStaffCollectionRef(restaurantId),
+        where('pin_code', '==', pin),
+        where('active', '==', true)
+    );
+
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+        return null;
+    }
+
+    // Return the first match (PINs should be unique)
+    const doc = snapshot.docs[0];
+    return {
+        id: doc.id,
+        ...doc.data()
+    } as StaffMember;
+};
+
 // ============================================
 // CRUD OPERATIONS
 // ============================================

@@ -154,28 +154,36 @@ export const sendOrderToKitchen = async (
 
             transaction.set(newSessionRef, newSession);
 
-            // Link session to table
+            // Link session to table AND mark as occupied (since we have orders)
             transaction.update(tableRef, {
                 active_session_id: sessionId,
                 status: 'occupied',
-                currentSessionId: sessionId
+                currentSessionId: sessionId,
+                current_session_total: newItemsTotal
             });
         } else {
             // Update existing session
             const sessionRef = doc(db, 'restaurants', restaurantId, 'sessions', sessionId!);
             const currentItems = currentSession.items || [];
             const updatedItems = [...currentItems, ...orderItems];
+            const newSessionTotal = (currentSession.total || 0) + newItemsTotal;
 
             transaction.update(sessionRef, {
                 items: updatedItems,
                 subtotal: (currentSession.subtotal || 0) + newItemsSubtotal,
                 tax: (currentSession.tax || 0) + newItemsTax,
-                total: (currentSession.total || 0) + newItemsTotal,
+                total: newSessionTotal,
                 remaining_amount: (currentSession.remaining_amount || 0) + newItemsTotal
             });
 
+            // Sync total to Table and ensure it is occupied
+            transaction.update(tableRef, {
+                current_session_total: newSessionTotal,
+                status: 'occupied' // Ensure it's occupied just in case
+            });
+
             console.log('✅ [sendOrderToKitchen] Session updated:', {
-                newTotal: (currentSession.total || 0) + newItemsTotal,
+                newTotal: newSessionTotal,
                 newRemaining: (currentSession.remaining_amount || 0) + newItemsTotal
             });
         }

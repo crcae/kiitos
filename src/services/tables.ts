@@ -12,9 +12,7 @@ import {
 import { db } from './firebaseConfig';
 import { Table } from '../types/firestore';
 
-// TODO: Get this dynamically from Auth Context
-const RESTAURANT_ID = 'kiitos-main';
-
+// Helper to get dynamic collection ref
 const getCollectionRef = (restaurantId: string) =>
     collection(db, 'restaurants', restaurantId, 'tables');
 
@@ -28,8 +26,8 @@ export const subscribeToTables = (restaurantId: string, callback: (tables: Table
     });
 };
 
-export const updateTableStatus = async (tableId: string, status: string, sessionId: string | null) => {
-    const tableRef = doc(getCollectionRef(RESTAURANT_ID), tableId);
+export const updateTableStatus = async (restaurantId: string, tableId: string, status: string, sessionId: string | null) => {
+    const tableRef = doc(getCollectionRef(restaurantId), tableId);
     await updateDoc(tableRef, {
         status,
         currentSessionId: sessionId,
@@ -38,20 +36,20 @@ export const updateTableStatus = async (tableId: string, status: string, session
     });
 };
 
-export const createTable = async (name: string) => {
+export const createTable = async (restaurantId: string, name: string) => {
     const tableData = {
         name,
         status: 'available',
         current_session_id: null,
-        active_session_id: null, // Syncing both for legacy support
-        restaurantId: RESTAURANT_ID,
+        active_session_id: null,
+        restaurantId: restaurantId,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
     };
-    await addDoc(getCollectionRef(RESTAURANT_ID), tableData);
+    await addDoc(getCollectionRef(restaurantId), tableData);
 };
 
-export const updateTable = async (id: string, data: Partial<Table>) => {
+export const updateTable = async (restaurantId: string, id: string, data: Partial<Table>) => {
     // Map simplified updates to dual fields if needed
     const updates: any = { ...data, updatedAt: serverTimestamp() };
 
@@ -60,9 +58,9 @@ export const updateTable = async (id: string, data: Partial<Table>) => {
         updates.active_session_id = data.currentSessionId;
     }
 
-    await updateDoc(doc(getCollectionRef(RESTAURANT_ID), id), updates);
+    await updateDoc(doc(getCollectionRef(restaurantId), id), updates);
 };
 
-export const deleteTable = async (id: string) => {
-    await deleteDoc(doc(getCollectionRef(RESTAURANT_ID), id));
+export const deleteTable = async (restaurantId: string, id: string) => {
+    await deleteDoc(doc(getCollectionRef(restaurantId), id));
 };

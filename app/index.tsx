@@ -9,48 +9,15 @@ export default function IndexScreen() {
     const router = useRouter();
     const { user, loading, signInWithRole } = useAuth();
 
-    // Smart routing logic
+    // Smart routing is now handled by _layout.tsx RootRouteGuard
+    // This screen serves as a dev landing or public landing fallback
     useEffect(() => {
-        if (loading) return;
-
-        // Not authenticated - show landing or role selector
-        if (!user) {
-            // For now, we'll show the legacy role selector for testing
-            // In production, uncomment this to redirect to landing:
-            // router.replace('/landing');
-            return;
+        if (!loading && user) {
+            // If RootRouteGuard doesn't catch it for some reason, basic fallback
+            // But usually RootRouteGuard handles it. 
+            // We can intentionally leave this empty or redirect to /admin if we trust the Guard.
         }
-
-        // Authenticated - check onboarding status
-        if (user.role === 'restaurant_owner' && !user.onboardingComplete) {
-            router.replace('/onboarding/business');
-            return;
-        }
-
-        // Onboarding complete - redirect to dashboard
-        redirectToDashboard(user.role);
     }, [user, loading]);
-
-    const redirectToDashboard = (role: UserRole) => {
-        switch (role) {
-            case 'restaurant_owner':
-            case 'restaurant_manager':
-            case 'admin':
-                router.replace('/admin');
-                break;
-            case 'waiter':
-                router.replace('/waiter/tables');
-                break;
-            case 'kitchen':
-                router.replace('/kitchen/display');
-                break;
-            case 'cashier':
-                router.replace('/cashier/status');
-                break;
-            default:
-                router.replace('/landing');
-        }
-    };
 
     // Legacy role selector for testing
     const handleLogin = async (role: UserRole, route: string) => {
