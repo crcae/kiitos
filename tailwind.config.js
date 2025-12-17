@@ -19,6 +19,13 @@ module.exports = {
           curcuma: '#F39C12',
           chile: '#C0392B',
         },
+        // Kiitos Brand Colors
+        kiitos: {
+          orange: '#f89219',
+          black: '#111827',
+          green: '#10B981',
+          cream: '#FFF7ED',
+        },
         // Keeping existing gray scale for compatibility
         gray: {
           50: '#F7F7F7',
