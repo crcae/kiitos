@@ -7,8 +7,7 @@ import { recordPayment } from '../../src/services/payments';
 import { Product, Category, Session } from '../../src/types/firestore';
 import { colors } from '../../src/styles/theme';
 import QRCode from 'react-native-qrcode-svg';
-
-const RESTAURANT_ID = 'kiitos-main';
+import { useAuth } from '../../src/context/AuthContext';
 
 interface CartItem {
     product: Product;
@@ -18,6 +17,8 @@ interface CartItem {
 export default function WaiterPOSScreen() {
     const { tableId, sessionId } = useLocalSearchParams<{ tableId: string, sessionId: string }>();
     const router = useRouter();
+    const { user } = useAuth();
+    const restaurantId = user?.restaurantId || 'kiitos-main';
 
     // Data State
     const [categories, setCategories] = useState<Category[]>([]);
@@ -37,20 +38,20 @@ export default function WaiterPOSScreen() {
     const waiterNumberRef = useRef(1); // Simple counter for this session
 
     useEffect(() => {
-        if (!RESTAURANT_ID) return;
+        if (!restaurantId) return;
 
-        const unsubCats = subscribeToGuestCategories(RESTAURANT_ID, (data) => {
+        const unsubCats = subscribeToGuestCategories(restaurantId, (data) => {
             setCategories(data);
             if (data.length > 0 && !selectedCategory) {
                 setSelectedCategory(data[0].id);
             }
         });
 
-        const unsubProds = subscribeToGuestProducts(RESTAURANT_ID, setProducts);
+        const unsubProds = subscribeToGuestProducts(restaurantId, setProducts);
 
         const unsubSession = subscribeToSession(sessionId!, (data) => {
             setSession(data);
-        }, RESTAURANT_ID);
+        }, restaurantId);
 
         setLoading(false);
 
@@ -59,7 +60,7 @@ export default function WaiterPOSScreen() {
             unsubProds();
             if (unsubSession) unsubSession();
         };
-    }, [sessionId]);
+    }, [sessionId, restaurantId]);
 
     const addToCart = (product: Product) => {
         setCart(prev => {
@@ -85,7 +86,7 @@ export default function WaiterPOSScreen() {
         if (cart.length === 0) return;
         try {
             const createdById = `waiter-${waiterNumberRef.current}`;
-            await sendOrderToKitchen(RESTAURANT_ID, tableId!, cart, createdById);
+            await sendOrderToKitchen(restaurantId, tableId!, cart, createdById);
             Alert.alert('Éxito', 'Orden enviada a cocina');
             setCart([]);
         } catch (error) {
@@ -125,7 +126,7 @@ export default function WaiterPOSScreen() {
                         text: 'Confirmar',
                         onPress: async () => {
                             try {
-                                await recordPayment(RESTAURANT_ID, sessionId!, cash, 'cash', `waiter-${waiterNumberRef.current}`, tip);
+                                await recordPayment(restaurantId, sessionId!, cash, 'cash', `waiter-${waiterNumberRef.current}`, tip);
                                 Alert.alert('¡Pago Registrado!', `Restante: $${(remaining - cash).toFixed(2)}`);
                                 setShowPaymentModal(false);
                                 setCashAmount('');
@@ -150,7 +151,7 @@ export default function WaiterPOSScreen() {
                         text: 'Confirmar',
                         onPress: async () => {
                             try {
-                                await recordPayment(RESTAURANT_ID, sessionId!, remaining, 'cash', `waiter-${waiterNumberRef.current}`, tip);
+                                await recordPayment(restaurantId, sessionId!, remaining, 'cash', `waiter-${waiterNumberRef.current}`, tip);
                                 Alert.alert('¡Cuenta Cerrada!', `Cambio: $${change.toFixed(2)}`);
                                 setShowPaymentModal(false);
                                 setCashAmount('');
@@ -187,7 +188,7 @@ export default function WaiterPOSScreen() {
     const grandTotal = sessionTotal + cartTotal;
 
     // Payment URL for QR code
-    const paymentUrl = `http://localhost:8081/pay/${sessionId}?restaurantId=${RESTAURANT_ID}`;
+    const paymentUrl = `http://localhost:8081/pay/${sessionId}?restaurantId=${restaurantId}`;
 
     if (loading) {
         return (

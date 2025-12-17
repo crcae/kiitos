@@ -1,29 +1,41 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
+import { LogOut } from 'lucide-react-native';
 import { subscribeToTables } from '../../src/services/tables';
 import { createSession } from '../../src/services/sessions';
 import { Table } from '../../src/types/firestore';
-
-const RESTAURANT_ID = 'kiitos-main';
+import { useAuth } from '../../src/context/AuthContext';
+import { useRestaurant } from '../../src/hooks/useRestaurant';
+import { colors } from '../../src/styles/theme';
 
 export default function TablesScreen() {
     const [tables, setTables] = useState<Table[]>([]);
     const router = useRouter();
+    const { signOut, user } = useAuth();
+    const { restaurant } = useRestaurant();
+    const restaurantId = user?.restaurantId || 'kiitos-main';
 
     useEffect(() => {
-        const unsubscribe = subscribeToTables(RESTAURANT_ID, setTables);
+        const unsubscribe = subscribeToTables(restaurantId, setTables);
         return () => unsubscribe();
-    }, []);
+    }, [restaurantId]);
 
     const handleTablePress = async (table: Table) => {
         if (table.status === 'available') {
-            // Start a new session
-            const sessionId = await createSession(RESTAURANT_ID, table.id, table.name);
+            const sessionId = await createSession(restaurantId, table.id, table.name);
             router.push({ pathname: '/waiter/pos', params: { tableId: table.id, sessionId } });
         } else if (table.status === 'occupied' && table.active_session_id) {
-            // Go to existing session
             router.push({ pathname: '/waiter/pos', params: { tableId: table.id, sessionId: table.active_session_id } });
+        }
+    };
+
+    const handleLogout = async () => {
+        try {
+            await signOut();
+            // Guard will handle redirect
+        } catch (error) {
+            Alert.alert('Error', 'No se pudo cerrar sesión');
         }
     };
 
@@ -33,15 +45,33 @@ export default function TablesScreen() {
             onPress={() => handleTablePress(item)}
         >
             <Text style={styles.tableName}>{item.name}</Text>
-            <Text style={styles.tableStatus}>{item.status}</Text>
+            <Text style={styles.tableStatus}>{item.status === 'occupied' ? 'Ocupada' : 'Disponible'}</Text>
+
+            {item.status === 'occupied' && item.current_session_total !== undefined && (
+                <View style={styles.totalBadge}>
+                    <Text style={styles.totalText}>${item.current_session_total.toFixed(2)}</Text>
+                </View>
+            )}
         </TouchableOpacity>
     );
 
     return (
         <View style={styles.container}>
+            {/* Header with Branding */}
             <View style={styles.header}>
-                <Text style={styles.title}>Mesas</Text>
+                <View>
+                    <Text style={styles.brandSubtitle}>
+                        {restaurant?.name || restaurant?.id || restaurantId || 'Cargando...'}
+                    </Text>
+                    <Text style={styles.title}>Mesas</Text>
+                </View>
+
+                <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+                    <LogOut size={20} color={colors.white} />
+                    <Text style={styles.logoutText}>Salir</Text>
+                </TouchableOpacity>
             </View>
+
             <FlatList
                 data={tables}
                 renderItem={renderItem}
@@ -56,21 +86,62 @@ export default function TablesScreen() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        padding: 20,
         backgroundColor: '#FDFBF7', // Oat Cream
     },
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 20,
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E2E8F0',
+        backgroundColor: '#FFFFFF',
+    },
+    brandSubtitle: {
+        fontSize: 12,
+        color: '#F97316', // Orange-500
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+        letterSpacing: 1,
+        marginBottom: 2,
     },
     title: {
         fontSize: 24,
         fontWeight: 'bold',
+        color: '#1E293B',
+    },
+    logoutButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#EF4444',
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        gap: 6
+    },
+    logoutText: {
+        color: '#FFFFFF',
+        fontWeight: 'bold',
+        fontSize: 14
     },
     list: {
+        padding: 20,
         gap: 15,
+    },
+    totalBadge: {
+        marginTop: 8,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#E67E22',
+    },
+    totalText: {
+        color: '#E67E22',
+        fontWeight: 'bold',
+        fontSize: 16,
     },
     tableCard: {
         flex: 1,

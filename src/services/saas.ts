@@ -143,16 +143,24 @@ export async function getRestaurantData(restaurantId: string): Promise<Restauran
 }
 
 /**
- * Marks onboarding as complete for a restaurant
+ * Marks onboarding as complete for a restaurant and the owner
  */
-export async function completeOnboarding(restaurantId: string): Promise<void> {
+export async function completeOnboarding(restaurantId: string, userId: string): Promise<void> {
     try {
+        // 1. Update Restaurant
         const restaurantRef = doc(db, 'restaurants', restaurantId);
         await updateDoc(restaurantRef, {
             onboardingComplete: true,
             updatedAt: Timestamp.now(),
         });
-        console.log(`✅ Onboarding completed for restaurant ${restaurantId}`);
+
+        // 2. Update User (Owner)
+        const userRef = doc(db, 'users', userId);
+        await updateDoc(userRef, {
+            onboardingComplete: true,
+        });
+
+        console.log(`✅ Onboarding completed for restaurant ${restaurantId} and user ${userId}`);
     } catch (error) {
         console.error('Error completing onboarding:', error);
         throw new Error('Failed to complete onboarding');

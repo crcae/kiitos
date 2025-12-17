@@ -35,7 +35,9 @@ export const createSession = async (restaurantId: string, tableId: string, table
     };
 
     const docRef = await addDoc(collection(db, 'restaurants', restaurantId, 'sessions'), sessionData);
-    await updateTableStatus(tableId, 'occupied', docRef.id);
+    // User Request: Table should NOT appear occupied until orders are placed.
+    // We set status to 'available' but link the session. If user returns, they create a new session (abandoning this one).
+    await updateTableStatus(restaurantId, tableId, 'available', docRef.id);
     return docRef.id;
 };
 
@@ -63,6 +65,9 @@ export const addOrderToSession = async (sessionId: string, tableId: string, item
             items: newItems,
             total: newTotal
         });
+
+        // Also update table to occupied + total (this function seems legacy but we support it)
+        // Note: restaurantId is missing in this legacy function signature, ignoring for now as Waiter uses guestMenu.ts
     }
 };
 

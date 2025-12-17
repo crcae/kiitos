@@ -9,40 +9,39 @@ import {
     query,
     orderBy,
     Timestamp,
-    onSnapshot
+    onSnapshot,
+    setDoc
 } from 'firebase/firestore';
 import { Alert } from 'react-native';
 import { db } from './firebaseConfig';
 import { Product, Category, RestaurantSettings } from '../types/firestore';
 
-const RESTAURANT_ID = 'kiitos-main'; // TODO: Dynamically get from auth context
-
 // Generic helpers
-const getCollectionRef = (subcollection: string) =>
-    collection(db, 'restaurants', RESTAURANT_ID, subcollection);
+const getCollectionRef = (restaurantId: string, subcollection: string) =>
+    collection(db, 'restaurants', restaurantId, subcollection);
 
-const getDocRef = (subcollection: string, id: string) =>
-    doc(db, 'restaurants', RESTAURANT_ID, subcollection, id);
+const getDocRef = (restaurantId: string, subcollection: string, id: string) =>
+    doc(db, 'restaurants', restaurantId, subcollection, id);
 
 // ============================================
 // PRODUCTS
 // ============================================
 
-export const getProducts = async (): Promise<Product[]> => {
-    const q = query(getCollectionRef('products'), orderBy('name'));
+export const getProducts = async (restaurantId: string): Promise<Product[]> => {
+    const q = query(getCollectionRef(restaurantId, 'products'), orderBy('name'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
 };
 
-export const createProduct = async (product: Omit<Product, 'id'>) => {
-    console.log('Attempting to create Product in restaurant:', RESTAURANT_ID);
-    if (!RESTAURANT_ID) {
+export const createProduct = async (restaurantId: string, product: Omit<Product, 'id'>) => {
+    // console.log('Attempting to create Product in restaurant:', restaurantId);
+    if (!restaurantId) {
         Alert.alert('Error', 'Restaurant ID is missing');
         throw new Error('Restaurant ID is missing');
     }
 
     try {
-        return await addDoc(getCollectionRef('products'), product);
+        return await addDoc(getCollectionRef(restaurantId, 'products'), product);
     } catch (e: any) {
         console.error('Error creating product:', e);
         Alert.alert('Error Firebase', e.message);
@@ -50,33 +49,33 @@ export const createProduct = async (product: Omit<Product, 'id'>) => {
     }
 };
 
-export const updateProduct = async (id: string, updates: Partial<Product>) => {
-    await updateDoc(getDocRef('products', id), updates);
+export const updateProduct = async (restaurantId: string, id: string, updates: Partial<Product>) => {
+    await updateDoc(getDocRef(restaurantId, 'products', id), updates);
 };
 
-export const deleteProduct = async (id: string) => {
-    await deleteDoc(getDocRef('products', id));
+export const deleteProduct = async (restaurantId: string, id: string) => {
+    await deleteDoc(getDocRef(restaurantId, 'products', id));
 };
 
 // ============================================
 // CATEGORIES
 // ============================================
 
-export const getCategories = async (): Promise<Category[]> => {
-    const q = query(getCollectionRef('categories'), orderBy('name', 'asc'));
+export const getCategories = async (restaurantId: string): Promise<Category[]> => {
+    const q = query(getCollectionRef(restaurantId, 'categories'), orderBy('name', 'asc'));
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
 };
 
-export const createCategory = async (category: Omit<Category, 'id'>) => {
-    console.log('Attempting to create Category in restaurant:', RESTAURANT_ID);
-    if (!RESTAURANT_ID) {
+export const createCategory = async (restaurantId: string, category: Omit<Category, 'id'>) => {
+    // console.log('Attempting to create Category in restaurant:', restaurantId);
+    if (!restaurantId) {
         Alert.alert('Error', 'Restaurant ID is missing');
         throw new Error('Restaurant ID is missing');
     }
 
     try {
-        return await addDoc(getCollectionRef('categories'), category);
+        return await addDoc(getCollectionRef(restaurantId, 'categories'), category);
     } catch (e: any) {
         console.error('Error creating category:', e);
         Alert.alert('Error Firebase', e.message);
@@ -84,38 +83,41 @@ export const createCategory = async (category: Omit<Category, 'id'>) => {
     }
 };
 
-export const updateCategory = async (id: string, updates: Partial<Category>) => {
-    await updateDoc(getDocRef('categories', id), updates);
+export const updateCategory = async (restaurantId: string, id: string, updates: Partial<Category>) => {
+    await updateDoc(getDocRef(restaurantId, 'categories', id), updates);
 };
 
-export const deleteCategory = async (id: string) => {
-    await deleteDoc(getDocRef('categories', id));
+export const deleteCategory = async (restaurantId: string, id: string) => {
+    await deleteDoc(getDocRef(restaurantId, 'categories', id));
 };
 
 
-export const subscribeToProducts = (callback: (products: Product[]) => void) => {
-    const q = query(getCollectionRef('products'), orderBy('name'));
+export const subscribeToProducts = (restaurantId: string, callback: (products: Product[]) => void) => {
+    if (!restaurantId) return () => { };
+    const q = query(getCollectionRef(restaurantId, 'products'), orderBy('name'));
     return onSnapshot(q, (snapshot) => {
         const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
         callback(products);
     }, (error) => {
         console.error("Error subscribing to products:", error);
-        Alert.alert('Data Error', 'Failed to subscribe to products: ' + error.message);
+        // Alert.alert('Data Error', 'Failed to subscribe to products: ' + error.message);
     });
 };
 
-export const subscribeToCategories = (callback: (categories: Category[]) => void) => {
-    const q = query(getCollectionRef('categories'), orderBy('name', 'asc'));
+export const subscribeToCategories = (restaurantId: string, callback: (categories: Category[]) => void) => {
+    if (!restaurantId) return () => { };
+    const q = query(getCollectionRef(restaurantId, 'categories'), orderBy('name', 'asc'));
     return onSnapshot(q, (snapshot) => {
         const categories = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Category));
         callback(categories);
     }, (error) => {
         console.error("Error subscribing to categories:", error);
-        Alert.alert('Data Error', 'Failed to subscribe to categories: ' + error.message);
+        // Alert.alert('Data Error', 'Failed to subscribe to categories: ' + error.message);
     });
 };
 
 export const subscribeToRestaurantConfig = (restaurantId: string, callback: (config: RestaurantSettings) => void) => {
+    if (!restaurantId) return () => { };
     const docRef = doc(db, 'restaurants', restaurantId);
     return onSnapshot(docRef, (doc) => {
         if (doc.exists()) {
@@ -135,11 +137,8 @@ export const subscribeToRestaurantConfig = (restaurantId: string, callback: (con
 
 export const updateRestaurantConfig = async (restaurantId: string, settings: Partial<RestaurantSettings>) => {
     const docRef = doc(db, 'restaurants', restaurantId);
-    // Construct updates object
-    const updates: any = {};
-    Object.keys(settings).forEach(key => {
-        updates[`settings.${key}`] = settings[key as keyof RestaurantSettings];
-    });
-
-    await updateDoc(docRef, updates);
+    // Use setDoc with merge: true but with a proper nested object structure
+    // NOT dot notation keys, which creates "settings.key" fields literal
+    const updates = { settings: settings };
+    await setDoc(docRef, updates, { merge: true });
 };

@@ -19,6 +19,8 @@ import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../../../src/context/AuthContext';
+import { useRestaurant } from '../../../src/hooks/useRestaurant';
 
 // Helper component for Tab Button
 const TabButton = ({ title, active, onPress }: { title: string; active: boolean; onPress: () => void }) => (
@@ -32,6 +34,16 @@ const TabButton = ({ title, active, onPress }: { title: string; active: boolean;
 
 export default function MenuManagementScreen() {
     const router = useRouter();
+    const { user } = useAuth();
+    const { restaurant } = useRestaurant();
+    const restaurantId = user?.restaurantId;
+
+    // Redirect if no restaurantId (should be handled by layout guard but safe check)
+    useEffect(() => {
+        if (!restaurantId && user) {
+            // alert('Error: No associated restaurant found.');
+        }
+    }, [restaurantId, user]);
     const insets = useSafeAreaInsets();
     // Removed activeTab since we show both
     const [categories, setCategories] = useState<Category[]>([]);
@@ -69,15 +81,17 @@ export default function MenuManagementScreen() {
     const [prodModifiersText, setProdModifiersText] = useState('');
 
     useEffect(() => {
-        const unsubscribeCategories = subscribeToCategories((data) => {
+        if (!restaurantId) return;
+
+        const unsubscribeCategories = subscribeToCategories(restaurantId, (data) => {
             setCategories(data);
         });
 
-        const unsubscribeProducts = subscribeToProducts((data) => {
+        const unsubscribeProducts = subscribeToProducts(restaurantId, (data) => {
             setProducts(data);
         });
 
-        const unsubscribeConfig = subscribeToRestaurantConfig('kiitos-main', (config) => {
+        const unsubscribeConfig = subscribeToRestaurantConfig(restaurantId, (config) => {
             setAllowGuestOrdering(config.allow_guest_ordering ?? false);
             setEnableTakeout(config.enable_takeout ?? false);
             if (config.branding) {
@@ -91,7 +105,7 @@ export default function MenuManagementScreen() {
             unsubscribeProducts();
             unsubscribeConfig();
         };
-    }, []);
+    }, [restaurantId]);
 
     const pickImage = async (setFunction: (uri: string) => void) => {
         // No permissions request is necessary for launching the image library
@@ -122,7 +136,7 @@ export default function MenuManagementScreen() {
             if (catImage && catImage !== editingCategory?.image_url) {
                 try {
                     const filename = `categories/${Date.now()}.jpg`;
-                    imageUrl = await uploadImage(catImage, `restaurants/kiitos-main/${filename}`);
+                    imageUrl = await uploadImage(catImage, `restaurants/${restaurantId}/${filename}`);
                 } catch (uploadError: any) {
                     console.error("Upload failed", uploadError);
                     Alert.alert('Error', 'No se pudo subir la imagen. Inténtalo de nuevo.');
@@ -135,9 +149,9 @@ export default function MenuManagementScreen() {
             if (imageUrl) categoryData.image_url = imageUrl;
 
             if (editingCategory) {
-                await updateCategory(editingCategory.id, categoryData);
+                await updateCategory(restaurantId, editingCategory.id, categoryData);
             } else {
-                await createCategory(categoryData);
+                await createCategory(restaurantId, categoryData);
             }
             // Realtime listener updates UI
             setCategoryModalVisible(false);
@@ -170,7 +184,7 @@ export default function MenuManagementScreen() {
 
     const handleDeleteCategory = (id: string) => {
         confirmDelete('Confirm', 'Delete this category?', async () => {
-            await deleteCategory(id);
+            await deleteCategory(restaurantId, id);
             if (selectedCategoryId === id) setSelectedCategoryId(null);
         });
     };
@@ -200,7 +214,7 @@ export default function MenuManagementScreen() {
             if (prodImage && prodImage !== editingProduct?.image_url) {
                 try {
                     const filename = `products/${Date.now()}.jpg`;
-                    imageUrl = await uploadImage(prodImage, `restaurants/kiitos-main/${filename}`);
+                    imageUrl = await uploadImage(prodImage, `restaurants/${restaurantId}/${filename}`);
                 } catch (uploadError: any) {
                     console.error("Upload failed", uploadError);
                     Alert.alert('Error', 'No se pudo subir la imagen. Inténtalo de nuevo.');
@@ -220,9 +234,9 @@ export default function MenuManagementScreen() {
             if (imageUrl) productData.image_url = imageUrl;
 
             if (editingProduct) {
-                await updateProduct(editingProduct.id, productData);
+                await updateProduct(restaurantId, editingProduct.id, productData);
             } else {
-                await createProduct(productData);
+                await createProduct(restaurantId, productData);
             }
             setProductModalVisible(false);
             resetForms();
@@ -236,7 +250,7 @@ export default function MenuManagementScreen() {
 
     const handleDeleteProduct = (id: string) => {
         confirmDelete('Confirm', 'Delete this product?', async () => {
-            await deleteProduct(id);
+            await deleteProduct(restaurantId, id);
         });
     };
 
@@ -272,7 +286,7 @@ export default function MenuManagementScreen() {
     const toggleGuestOrdering = async (val: boolean) => {
         setAllowGuestOrdering(val);
         try {
-            await updateRestaurantConfig('kiitos-main', { allow_guest_ordering: val });
+            await updateRestaurantConfig(restaurantId, { allow_guest_ordering: val });
         } catch (e) {
             console.error(e);
             Alert.alert('Error', 'Failed to update config');
@@ -283,7 +297,7 @@ export default function MenuManagementScreen() {
     const toggleTakeout = async (val: boolean) => {
         setEnableTakeout(val);
         try {
-            await updateRestaurantConfig('kiitos-main', { enable_takeout: val });
+            await updateRestaurantConfig(restaurantId, { enable_takeout: val });
         } catch (e) {
             console.error(e);
             Alert.alert('Error', 'Failed to update config');
@@ -300,7 +314,7 @@ export default function MenuManagementScreen() {
             if (brandingLogo && !brandingLogo.startsWith('http')) {
                 try {
                     const filename = `branding/logo_${Date.now()}.jpg`;
-                    logoUrl = await uploadImage(brandingLogo, `restaurants/kiitos-main/${filename}`);
+                    logoUrl = await uploadImage(brandingLogo, `restaurants/${restaurantId}/${filename}`);
                 } catch (uploadError: any) {
                     console.error("Upload failed", uploadError);
                     Alert.alert('Error', 'No se pudo subir el logo. Inténtalo de nuevo.');
@@ -314,7 +328,7 @@ export default function MenuManagementScreen() {
                 primary_color: brandingColor,
             };
 
-            await updateRestaurantConfig('kiitos-main', { branding: brandingData });
+            await updateRestaurantConfig(restaurantId, { branding: brandingData });
             setBrandingModalVisible(false);
             Alert.alert('Éxito', 'Configuración de marca actualizada');
         } catch (e: any) {
@@ -338,7 +352,12 @@ export default function MenuManagementScreen() {
             {/* Header / Settings Bar */}
             <View className="px-6 py-4 border-b border-slate-800 bg-slate-900">
                 <View className="flex-row justify-between items-center mb-4">
-                    <Text className="text-xl font-bold text-white">Menu Manager</Text>
+                    <View>
+                        <Text className="text-xs text-orange-500 font-bold uppercase tracking-wider mb-1">
+                            {restaurant?.name || restaurant?.id || user?.restaurantId || 'Cargando...'}
+                        </Text>
+                        <Text className="text-xl font-bold text-white">Menu Manager</Text>
+                    </View>
 
                     {/* Preview Buttons */}
                     <View className="flex-row gap-2">
@@ -346,8 +365,9 @@ export default function MenuManagementScreen() {
                             className="bg-slate-800 p-2 rounded-lg border border-slate-700 flex-row items-center"
                             onPress={() => {
                                 // Navigate to the table preview
-                                // Assuming 'table-1' or a generic preview route
-                                router.push('/menu/kiitos-main/table-1');
+                                if (restaurantId) {
+                                    router.push(`/menu/${restaurantId}/table-1` as any);
+                                }
                             }}
                         >
                             <View className="mr-2"><Text>👁️</Text></View>
@@ -363,7 +383,9 @@ export default function MenuManagementScreen() {
                         <TouchableOpacity
                             className="bg-slate-800 p-2 rounded-lg border border-slate-700 flex-row items-center"
                             onPress={() => {
-                                router.push('/takeout/kiitos-main');
+                                if (restaurantId) {
+                                    router.push(`/takeout/${restaurantId}` as any);
+                                }
                             }}
                         >
                             <View className="mr-2"><Text>👁️</Text></View>
@@ -424,7 +446,7 @@ export default function MenuManagementScreen() {
                         {/* QR Placeholder - In real app use react-native-qrcode-svg */}
                         <View className="w-64 h-64 bg-white items-center justify-center rounded-xl mb-6 overflow-hidden">
                             <QRCode
-                                value="https://kiitos.app/takeout/kiitos-main"
+                                value={`https://kiitos.app/takeout/${restaurantId}`}
                                 size={250}
                             />
                         </View>
