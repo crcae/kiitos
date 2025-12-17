@@ -1,20 +1,26 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ScrollView, ActivityIndicator, StatusBar, Platform, Modal } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShoppingBag, ChevronLeft, Plus, Minus, FileText, Utensils, CheckCircle } from 'lucide-react-native';
-import { colors } from '../../../src/styles/theme';
-import { subscribeToGuestCategories, subscribeToGuestProducts, getTableDetails, sendOrderToKitchen, subscribeToActiveSession } from '../../../src/services/guestMenu';
-import { subscribeToRestaurantConfig } from '../../../src/services/menu';
-import { Category, Product, Table, OrderItem, RestaurantSettings } from '../../../src/types/firestore';
+import { colors } from '../styles/theme';
+import { subscribeToGuestCategories, subscribeToGuestProducts, getTableDetails, sendOrderToKitchen, subscribeToActiveSession } from '../services/guestMenu';
+import { subscribeToRestaurantConfig } from '../services/menu';
+import { Category, Product, Table, OrderItem, RestaurantSettings } from '../types/firestore';
 
 interface CartItem {
     product: Product;
     quantity: number;
 }
 
-export default function DigitalMenuScreen() {
-    const { restaurantId, tableId } = useLocalSearchParams<{ restaurantId: string; tableId: string }>();
+interface DigitalMenuInterfaceProps {
+    restaurantId: string;
+    tableId: string;
+    mode?: 'guest' | 'waiter';
+    sessionId?: string; // Optional pre-supplied session ID
+}
+
+export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'guest', sessionId: initialSessionId }: DigitalMenuInterfaceProps) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
 
@@ -35,7 +41,7 @@ export default function DigitalMenuScreen() {
     // Shared Session State
     const [sessionItems, setSessionItems] = useState<OrderItem[]>([]);
     const [sessionTotal, setSessionTotal] = useState(0);
-    const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+    const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
 
     useEffect(() => {
         if (!restaurantId || !tableId) return;
@@ -45,7 +51,6 @@ export default function DigitalMenuScreen() {
                 // Fetch static data
                 const tableData = await getTableDetails(restaurantId, tableId);
                 setTable(tableData);
-                // setAllowOrdering is now handled by realtime subscription
 
                 // Realtime subscriptions
                 const unsubCats = subscribeToGuestCategories(restaurantId, (data) => {
@@ -61,14 +66,6 @@ export default function DigitalMenuScreen() {
                     setBranding(config.branding);
                 });
 
-                // Subscribe to Active Session for "Bill" tab
-                // Note: The service implementation returns an unsubscribe function (nested inside effectively)
-                // Use a wrapper or simplified effect for session if the service structure is complex wait.
-                // The service as written: subscribeToActiveSession returns the snapshot unsubscribe.
-                // However, inside it creates ANOTHER listener. This is complex to unsubscribe cleanly without refactoring service.
-                // For MVP, we will assume the overhead is acceptable or refactor service later. 
-                // Actually service returns the unsubscribe of the TABLE listener, but the nested one leaks. 
-                // We will rely on it for now.
                 const unsubSession = subscribeToActiveSession(restaurantId, tableId, (items, total, sessionId) => {
                     setSessionItems(items);
                     setSessionTotal(total);
@@ -122,7 +119,15 @@ export default function DigitalMenuScreen() {
         if (!restaurantId || !tableId) return;
         setLoading(true);
         try {
-            await sendOrderToKitchen(restaurantId, tableId, cart);
+            // Include created_by in the order
+            const createdById = mode === 'waiter' ? `waiter-app` : undefined; // Backend should handle assigning specific waiter ID if not provided, or we can improve this.
+            // For now, let's just use 'waiter-app' as a generic ID or allow the service to handle 'waiter' vs 'guest' via the 'created_by' field which sendOrderToKitchen might default to guest.
+            // Let's modify sendOrderToKitchen if needed, but for now passing cart is standard.
+            // DigitalMenuScreen previously didn't pass created_by, so it defaulted to guest.
+            // We need to check if sendOrderToKitchen accepts a creator.
+            // As per previous file view of waiter/pos.tsx: await sendOrderToKitchen(restaurantId, tableId!, cart, createdById);
+
+            await sendOrderToKitchen(restaurantId, tableId, cart, createdById);
             setCart([]);
             setSuccessModalVisible(true);
             setTimeout(() => {
@@ -131,7 +136,7 @@ export default function DigitalMenuScreen() {
             }, 2000);
         } catch (e) {
             console.error(e);
-            alert("Error enviando pedido. Intenta de nuevo."); // Fallback for error
+            alert("Error enviando pedido. Intenta de nuevo.");
         } finally {
             setLoading(false);
         }
@@ -152,7 +157,11 @@ export default function DigitalMenuScreen() {
         if (currentSessionId) {
             router.push({
                 pathname: "/pay/[id]",
-                params: { id: currentSessionId, restaurantId: restaurantId }
+                params: {
+                    id: currentSessionId,
+                    restaurantId: restaurantId,
+                    mode: mode // Pass the mode ('guest' or 'waiter') to the payment screen
+                }
             });
         } else {
             alert("No active session found.");
@@ -180,6 +189,12 @@ export default function DigitalMenuScreen() {
             {/* Header */}
             <View className="px-5 py-4 flex-row justify-between items-center bg-white border-b border-gray-100">
                 <View>
+                    {mode === 'waiter' && (
+                        <View className="bg-orange-100 px-2 py-0.5 rounded self-start mb-1 border border-orange-200">
+                            <Text className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">PORTAL MESERO</Text>
+                        </View>
+                    )}
+
                     {branding?.logo_url ? (
                         <Image
                             source={{ uri: branding.logo_url }}
@@ -245,7 +260,7 @@ export default function DigitalMenuScreen() {
                         }
                         renderItem={({ item }) => (
                             <View className="flex-row mb-6 bg-white">
-                                {/* Image (Left) */}
+                                {/* Image */}
                                 {item.image_url ? (
                                     <Image source={{ uri: item.image_url }} className="w-28 h-28 rounded-xl bg-gray-100 mr-4" resizeMode="cover" />
                                 ) : (
@@ -254,7 +269,7 @@ export default function DigitalMenuScreen() {
                                     </View>
                                 )}
 
-                                {/* Content (Right) */}
+                                {/* Content */}
                                 <View className="flex-1 justify-between py-1">
                                     <View>
                                         <Text className="text-lg font-bold text-gray-900 leading-tight mb-1">{item.name}</Text>
@@ -264,7 +279,8 @@ export default function DigitalMenuScreen() {
                                     <View className="flex-row justify-between items-center mt-3">
                                         <Text className="text-base font-semibold text-gray-900" style={branding?.primary_color ? { color: branding.primary_color } : {}}>${item.price.toFixed(2)}</Text>
 
-                                        {allowOrdering && (
+                                        {/* Ordering Controls - Check allow_guest_ordering unless mode is waiter (waiters always order) */}
+                                        {(allowOrdering || mode === 'waiter') && (
                                             getQuantity(item.id) === 0 ? (
                                                 <TouchableOpacity
                                                     onPress={() => addToCart(item)}
@@ -291,7 +307,7 @@ export default function DigitalMenuScreen() {
                     />
 
                     {/* Floating Action Bar (Cart) */}
-                    {allowOrdering && cartCount > 0 && (
+                    {(allowOrdering || mode === 'waiter') && cartCount > 0 && (
                         <View className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100" style={{ paddingBottom: insets.bottom + 10 }}>
                             <TouchableOpacity
                                 onPress={handleSendOrder}
@@ -315,7 +331,7 @@ export default function DigitalMenuScreen() {
             {activeTab === 'bill' && (
                 <FlatList
                     data={sessionItems}
-                    keyExtractor={(item, index) => item.id + index} // Items might not have unique IDs if grouped, but here logic assumes raw list
+                    keyExtractor={(item, index) => item.id + index}
                     contentContainerStyle={{ padding: 20, paddingBottom: 100 }}
                     ListHeaderComponent={
                         <View className="mb-6">
@@ -326,7 +342,6 @@ export default function DigitalMenuScreen() {
                     ListEmptyComponent={
                         <View className="items-center justify-center py-20">
                             <Text className="text-gray-400">No items ordered yet.</Text>
-                            <Text className="text-gray-400 text-xs mt-2 text-center px-10">If you just ordered, make sure to create the Firestore Index in the console!</Text>
                         </View>
                     }
                     renderItem={({ item }) => (
@@ -371,7 +386,9 @@ export default function DigitalMenuScreen() {
                                     className="bg-black py-4 rounded-2xl items-center shadow-lg"
                                     style={branding?.primary_color ? { backgroundColor: branding.primary_color } : {}}
                                 >
-                                    <Text className="font-bold text-white text-lg">Pay Bill</Text>
+                                    <Text className="font-bold text-white text-lg">
+                                        {mode === 'waiter' ? 'Cobrar / Pagar' : 'Pay Bill'}
+                                    </Text>
                                 </TouchableOpacity>
                             </View>
                         ) : null
@@ -391,7 +408,6 @@ export default function DigitalMenuScreen() {
                     </View>
                 </View>
             </Modal>
-
         </View>
     );
 }
