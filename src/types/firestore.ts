@@ -139,13 +139,21 @@ export interface Table {
 // ORDERS & SESSIONS
 // ============================================
 
+export interface SelectedModifier {
+    id: string;
+    name: string;
+    price: number;
+    group_name?: string;
+}
+
 export interface OrderItem {
     id: string; // Product/MenuItem ID
     session_id: string;
     product_id: string;
-    modifiers?: ProductModifier[];
+    modifiers?: SelectedModifier[];
     created_by: 'guest' | 'waiter'; // For legacy compatibility
     created_by_id?: string; // Format: "guest-1", "guest-2", "waiter-1", etc.
+    created_by_name?: string; // Name of the person who created the order
 
     // Payment tracking
     paid_quantity: number; // Number of units paid (0 to quantity)
@@ -241,10 +249,20 @@ export interface Category {
     image_url?: string;
 }
 
-export interface ProductModifier {
+export interface ModifierOption {
     id: string;
     name: string;
-    price_adjustment: number;
+    price: number;
+    available: boolean;
+}
+
+export interface ModifierGroup {
+    id: string;
+    name: string; // The label/question e.g. "Choose Sauce"
+    min_selections: number;
+    max_selections: number;
+    required: boolean;
+    options: ModifierOption[];
 }
 
 export interface Product {
@@ -254,7 +272,7 @@ export interface Product {
     description?: string;
     price: number;
     image_url?: string;
-    modifiers?: ProductModifier[];
+    modifiers?: ModifierGroup[];
     available: boolean;
 }
 
@@ -322,7 +340,7 @@ export interface PickupOrderItem {
     name: string;
     price: number;
     quantity: number;
-    modifiers?: ProductModifier[];
+    modifiers?: SelectedModifier[];
 }
 
 export interface PickupOrder {

@@ -14,7 +14,7 @@ import {
 import BrandingColorPicker from '../../../src/components/BrandingColorPicker';
 import { RestaurantSettings } from '../../../src/types/firestore';
 import { uploadImage } from '../../../src/services/storage';
-import { Product, Category, ProductModifier } from '../../../src/types/firestore';
+import { Product, Category, ModifierGroup, ModifierOption } from '../../../src/types/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
@@ -77,8 +77,8 @@ export default function MenuManagementScreen() {
     const [prodPrice, setProdPrice] = useState('');
     // prodCategory is now derived from selectedCategoryId for new products
     const [prodImage, setProdImage] = useState<string | null>(null);
-    // Simple modifier implementation: comma separated strings for now or just generic
-    const [prodModifiersText, setProdModifiersText] = useState('');
+    // Structured modifiers state
+    const [prodModifiers, setProdModifiers] = useState<ModifierGroup[]>([]);
 
     useEffect(() => {
         if (!restaurantId) return;
@@ -191,6 +191,57 @@ export default function MenuManagementScreen() {
 
     // --- Products Handlers ---
 
+    // --- Modifiers Helpers ---
+
+    const addModifierGroup = () => {
+        setProdModifiers([...prodModifiers, {
+            id: Date.now().toString(),
+            name: '',
+            min_selections: 0,
+            max_selections: 1,
+            required: false,
+            options: []
+        }]);
+    };
+
+    const updateModifierGroup = (index: number, field: keyof ModifierGroup, value: any) => {
+        const newModifiers = [...prodModifiers];
+        newModifiers[index] = { ...newModifiers[index], [field]: value };
+        setProdModifiers(newModifiers);
+    };
+
+    const removeModifierGroup = (index: number) => {
+        const newModifiers = [...prodModifiers];
+        newModifiers.splice(index, 1);
+        setProdModifiers(newModifiers);
+    };
+
+    const addOptionToGroup = (groupIndex: number) => {
+        const newModifiers = [...prodModifiers];
+        newModifiers[groupIndex].options.push({
+            id: Date.now().toString(),
+            name: '',
+            price: 0,
+            available: true
+        });
+        setProdModifiers(newModifiers);
+    };
+
+    const updateOptionInGroup = (groupIndex: number, optionIndex: number, field: keyof ModifierOption, value: any) => {
+        const newModifiers = [...prodModifiers];
+        const group = newModifiers[groupIndex];
+        const option = group.options[optionIndex];
+        // @ts-ignore
+        group.options[optionIndex] = { ...option, [field]: value };
+        setProdModifiers(newModifiers);
+    };
+
+    const removeOptionFromGroup = (groupIndex: number, optionIndex: number) => {
+        const newModifiers = [...prodModifiers];
+        newModifiers[groupIndex].options.splice(optionIndex, 1);
+        setProdModifiers(newModifiers);
+    };
+
     const handleSaveProduct = async () => {
         // Use selectedCategoryId if creating new, or the product's existing category id (though we usually edit in context)
         // For simplicity in this layout, we enforce creating products in the selected category.
@@ -201,11 +252,7 @@ export default function MenuManagementScreen() {
             return;
         }
 
-        const modifiers: ProductModifier[] = prodModifiersText.split(',').filter(m => m.trim()).map((m, idx) => ({
-            id: `${Date.now()}-${idx}`,
-            name: m.trim(),
-            price_adjustment: 0 // Default 0 for simple list
-        }));
+        const modifiers = prodModifiers;
 
         try {
             setUploading(true);
@@ -262,7 +309,7 @@ export default function MenuManagementScreen() {
         setProdName('');
         setProdDesc('');
         setProdPrice('');
-        setProdModifiersText('');
+        setProdModifiers([]);
         setProdImage(null);
     };
 
@@ -278,7 +325,7 @@ export default function MenuManagementScreen() {
         setProdName(prod.name);
         setProdDesc(prod.description || '');
         setProdPrice(prod.price.toString());
-        setProdModifiersText(prod.modifiers?.map(m => m.name).join(', ') || '');
+        setProdModifiers(prod.modifiers || []);
         setProdImage(prod.image_url || null);
         setProductModalVisible(true);
     };
@@ -649,12 +696,49 @@ export default function MenuManagementScreen() {
 
                                 {/* Removed Category Picker - Implicitly uses selectedCategoryId */}
 
-                                <AirbnbInput
-                                    label="Modifiers (comma separated)"
-                                    value={prodModifiersText}
-                                    onChangeText={setProdModifiersText}
-                                    placeholder="Cheese, Bacon, No Pickle"
-                                />
+                                <View className="mt-4 mb-4">
+                                    <Text className="text-sm font-bold text-slate-700 mb-2">Customizations</Text>
+                                    {prodModifiers.map((group, gIdx) => (
+                                        <View key={group.id} className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                            <View className="flex-row justify-between items-center mb-2">
+                                                <Text className="font-bold text-slate-700">Group {gIdx + 1}</Text>
+                                                <TouchableOpacity onPress={() => removeModifierGroup(gIdx)}>
+                                                    <Trash2 size={16} color={colors.chile} />
+                                                </TouchableOpacity>
+                                            </View>
+                                            <AirbnbInput label="Label (e.g. Choose Sauce)" value={group.name} onChangeText={(t) => updateModifierGroup(gIdx, 'name', t)} />
+                                            <View className="flex-row gap-2">
+                                                <View className="flex-1">
+                                                    <AirbnbInput label="Min" value={group.min_selections.toString()} onChangeText={(t) => updateModifierGroup(gIdx, 'min_selections', parseInt(t) || 0)} keyboardType="numeric" />
+                                                </View>
+                                                <View className="flex-1">
+                                                    <AirbnbInput label="Max" value={group.max_selections.toString()} onChangeText={(t) => updateModifierGroup(gIdx, 'max_selections', parseInt(t) || 0)} keyboardType="numeric" />
+                                                </View>
+                                            </View>
+
+                                            <Text className="text-xs font-bold text-slate-500 mt-2 mb-1">Options</Text>
+                                            {group.options.map((opt, oIdx) => (
+                                                <View key={opt.id} className="flex-row gap-2 mb-2 items-center">
+                                                    <View className="flex-[2]">
+                                                        <AirbnbInput label="Option Name" placeholder="Option Name" value={opt.name} onChangeText={(t) => updateOptionInGroup(gIdx, oIdx, 'name', t)} />
+                                                    </View>
+                                                    <View className="flex-1">
+                                                        <AirbnbInput label="Price" placeholder="Price" value={opt.price.toString()} onChangeText={(t) => updateOptionInGroup(gIdx, oIdx, 'price', parseFloat(t) || 0)} keyboardType="numeric" />
+                                                    </View>
+                                                    <TouchableOpacity onPress={() => removeOptionFromGroup(gIdx, oIdx)} className="mt-2">
+                                                        <Trash2 size={16} color={colors.chile} />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            ))}
+                                            <TouchableOpacity onPress={() => addOptionToGroup(gIdx)} className="mt-2 bg-slate-200 p-2 rounded items-center">
+                                                <Text className="text-xs font-bold text-slate-600">+ Add Option</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                    <TouchableOpacity onPress={addModifierGroup} className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 items-center">
+                                        <Text className="text-indigo-600 font-bold">+ Add Modifier Group</Text>
+                                    </TouchableOpacity>
+                                </View>
 
                                 <TouchableOpacity onPress={() => pickImage(setProdImage)} className="mb-4 mt-2 items-center justify-center h-32 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300">
                                     {prodImage ? (
@@ -687,12 +771,49 @@ export default function MenuManagementScreen() {
 
                                     {/* Removed Category Picker - Implicitly uses selectedCategoryId */}
 
-                                    <AirbnbInput
-                                        label="Modifiers (comma separated)"
-                                        value={prodModifiersText}
-                                        onChangeText={setProdModifiersText}
-                                        placeholder="Cheese, Bacon, No Pickle"
-                                    />
+                                    <View className="mt-4 mb-4">
+                                        <Text className="text-sm font-bold text-slate-700 mb-2">Customizations</Text>
+                                        {prodModifiers.map((group, gIdx) => (
+                                            <View key={group.id} className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                                <View className="flex-row justify-between items-center mb-2">
+                                                    <Text className="font-bold text-slate-700">Group {gIdx + 1}</Text>
+                                                    <TouchableOpacity onPress={() => removeModifierGroup(gIdx)}>
+                                                        <Trash2 size={16} color={colors.chile} />
+                                                    </TouchableOpacity>
+                                                </View>
+                                                <AirbnbInput label="Label (e.g. Choose Sauce)" value={group.name} onChangeText={(t) => updateModifierGroup(gIdx, 'name', t)} />
+                                                <View className="flex-row gap-2">
+                                                    <View className="flex-1">
+                                                        <AirbnbInput label="Min" value={group.min_selections.toString()} onChangeText={(t) => updateModifierGroup(gIdx, 'min_selections', parseInt(t) || 0)} keyboardType="numeric" />
+                                                    </View>
+                                                    <View className="flex-1">
+                                                        <AirbnbInput label="Max" value={group.max_selections.toString()} onChangeText={(t) => updateModifierGroup(gIdx, 'max_selections', parseInt(t) || 0)} keyboardType="numeric" />
+                                                    </View>
+                                                </View>
+
+                                                <Text className="text-xs font-bold text-slate-500 mt-2 mb-1">Options</Text>
+                                                {group.options.map((opt, oIdx) => (
+                                                    <View key={opt.id} className="flex-row gap-2 mb-2 items-center">
+                                                        <View className="flex-[2]">
+                                                            <AirbnbInput label="Option Name" placeholder="Option Name" value={opt.name} onChangeText={(t) => updateOptionInGroup(gIdx, oIdx, 'name', t)} />
+                                                        </View>
+                                                        <View className="flex-1">
+                                                            <AirbnbInput label="Price" placeholder="Price" value={opt.price.toString()} onChangeText={(t) => updateOptionInGroup(gIdx, oIdx, 'price', parseFloat(t) || 0)} keyboardType="numeric" />
+                                                        </View>
+                                                        <TouchableOpacity onPress={() => removeOptionFromGroup(gIdx, oIdx)} className="mt-2">
+                                                            <Trash2 size={16} color={colors.chile} />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                ))}
+                                                <TouchableOpacity onPress={() => addOptionToGroup(gIdx)} className="mt-2 bg-slate-200 p-2 rounded items-center">
+                                                    <Text className="text-xs font-bold text-slate-600">+ Add Option</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        ))}
+                                        <TouchableOpacity onPress={addModifierGroup} className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 items-center">
+                                            <Text className="text-indigo-600 font-bold">+ Add Modifier Group</Text>
+                                        </TouchableOpacity>
+                                    </View>
 
                                     <TouchableOpacity onPress={() => pickImage(setProdImage)} className="mb-4 mt-2 items-center justify-center h-32 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300">
                                         {prodImage ? (
