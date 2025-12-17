@@ -23,7 +23,7 @@ export const recordPayment = async (
     sessionId: string,
     amount: number,
     method: PaymentMethod,
-    createdBy?: string,
+    createdBy: string = 'guest', // was optional, now default 'guest'
     tip?: number,
     items?: PaymentItem[]
 ): Promise<void> => {
@@ -298,20 +298,39 @@ export const recordItemPayment = async (
             console.log('✅ [recordItemPayment] Payment record creado:', paymentRef.id);
 
             // CRITICAL: Update session.items array with paid_quantity
+            // We must track remaining quantity to pay for each item ID to avoid applying payment to multiple rows
+            const quantityToPayMap = new Map<string, number>();
+            items.forEach(i => {
+                const current = quantityToPayMap.get(i.item_id) || 0;
+                quantityToPayMap.set(i.item_id, current + i.quantity);
+            });
+
             const currentItems = session.items || [];
             const updatedItems = currentItems.map((sessionItem: OrderItem) => {
-                // Find if this item was part of the payment
-                const paidItem = items.find(p => p.item_id === sessionItem.id);
+                const qtyRemainingToPay = quantityToPayMap.get(sessionItem.id);
 
-                if (paidItem) {
-                    const newPaidQuantity = (sessionItem.paid_quantity || 0) + paidItem.quantity;
-                    console.log(`🔵 [recordItemPayment] Actualizando item ${sessionItem.id}: paid_quantity ${sessionItem.paid_quantity || 0} → ${newPaidQuantity}`);
+                if (qtyRemainingToPay && qtyRemainingToPay > 0) {
+                    // Calculate how much we can pay on this specific row
+                    // We can't pay more than the item's quantity
+                    // We can't pay more than what's remaining in our payment balance
+                    const unpaidQtyInRow = sessionItem.quantity - (sessionItem.paid_quantity || 0);
 
-                    return {
-                        ...sessionItem,
-                        paid_quantity: newPaidQuantity,
-                        payment_ids: [...(sessionItem.payment_ids || []), paymentRef.id]
-                    };
+                    // How much of the payment applies to this row?
+                    const amountToApply = Math.min(qtyRemainingToPay, unpaidQtyInRow);
+
+                    if (amountToApply > 0) {
+                        const newPaidQuantity = (sessionItem.paid_quantity || 0) + amountToApply;
+                        console.log(`🔵 [recordItemPayment] Actualizando item ${sessionItem.id} (row): paid_quantity ${sessionItem.paid_quantity || 0} → ${newPaidQuantity}`);
+
+                        // Decrement our running balance
+                        quantityToPayMap.set(sessionItem.id, qtyRemainingToPay - amountToApply);
+
+                        return {
+                            ...sessionItem,
+                            paid_quantity: newPaidQuantity,
+                            payment_ids: [...(sessionItem.payment_ids || []), paymentRef.id]
+                        };
+                    }
                 }
                 return sessionItem;
             });
