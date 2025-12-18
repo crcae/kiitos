@@ -151,7 +151,10 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                         const isPaid = item.unitIndex < (item.paid_quantity || 0);
                         return selectedVirtualIds.has(item.virtualId) && !isPaid;
                     })
-                    .reduce((sum, item) => sum + item.price, 0);
+                    .reduce((sum, item) => {
+                        const modifiersTotal = item.modifiers?.reduce((mSum, mod) => mSum + mod.price, 0) || 0;
+                        return sum + (item.price + modifiersTotal);
+                    }, 0);
             case 'equal':
                 const count = parseInt(splitCount) || 1;
                 return remaining / count;
@@ -600,8 +603,17 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                                             styles.itemName,
                                             isPaid && styles.itemNamePaid
                                         ]}>
-                                            1x {expandedItem.name}
+                                            1x {expandedItem.name} ({expandedItem.created_by === 'waiter' || expandedItem.created_by_id?.startsWith('waiter') ? 'Mesero' : (expandedItem.created_by_name || 'Cliente')})
                                         </Text>
+                                        {expandedItem.modifiers && expandedItem.modifiers.length > 0 && (
+                                            <View style={{ marginTop: 2 }}>
+                                                {expandedItem.modifiers.map((mod, mIdx) => (
+                                                    <Text key={mIdx} style={{ fontSize: 11, color: '#888' }}>
+                                                        + {mod.name} {mod.price > 0 ? `($${mod.price.toFixed(2)})` : ''}
+                                                    </Text>
+                                                ))}
+                                            </View>
+                                        )}
                                         {isPaid && (
                                             <Text style={styles.paidBadge}>Pagado</Text>
                                         )}
@@ -612,7 +624,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                                     styles.itemPrice,
                                     isPaid && styles.itemPricePaid
                                 ]}>
-                                    ${expandedItem.price.toFixed(2)}
+                                    ${(expandedItem.price + (expandedItem.modifiers?.reduce((sum, mod) => sum + mod.price, 0) || 0)).toFixed(2)}
                                 </Text>
                             </TouchableOpacity>
                         );
