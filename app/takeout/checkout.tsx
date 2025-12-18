@@ -129,11 +129,22 @@ export default function TakeoutCheckoutScreen() {
                 {/* Cart Items */}
                 <View className="bg-white rounded-xl border border-stone-200 p-4 mb-4">
                     <Text className="text-lg font-semibold text-stone-900 mb-4">Tu Pedido</Text>
-                    {items.map((item) => (
-                        <View key={item.product_id} className="flex-row items-center justify-between py-3 border-b border-stone-100">
+                    {items.map((item, idx) => (
+                        <View key={`${item.product_id}_${idx}`} className="flex-row items-center justify-between py-3 border-b border-stone-100">
                             <View className="flex-1">
                                 <Text className="text-base font-medium text-stone-900">{item.name}</Text>
-                                <Text className="text-sm text-stone-600">${item.price.toFixed(2)}</Text>
+                                {item.modifiers && item.modifiers.length > 0 && (
+                                    <View className="mt-1">
+                                        {item.modifiers.map((mod, mIdx) => (
+                                            <Text key={mIdx} className="text-xs text-stone-500">
+                                                + {mod.name} {mod.price > 0 ? `($${mod.price.toFixed(2)})` : ''}
+                                            </Text>
+                                        ))}
+                                    </View>
+                                )}
+                                <Text className="text-sm text-stone-600 mt-1">
+                                    ${(item.price + (item.modifiers?.reduce((sum, mod) => sum + mod.price, 0) || 0)).toFixed(2)}
+                                </Text>
                             </View>
                             <View className="flex-row items-center">
                                 <TouchableOpacity

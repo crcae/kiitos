@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PickupOrderItem, Product } from '../types/firestore';
+import { PickupOrderItem, Product, SelectedModifier } from '../types/firestore';
 
 interface TakeoutCartItem extends PickupOrderItem {
     // Extend with any additional UI-specific fields if needed
@@ -9,7 +9,7 @@ interface TakeoutCartItem extends PickupOrderItem {
 interface TakeoutCartContextType {
     items: TakeoutCartItem[];
     restaurantId: string | null;
-    addItem: (product: Product, quantity: number) => Promise<void>;
+    addItem: (product: Product, quantity: number, modifiers?: SelectedModifier[]) => Promise<void>;
     removeItem: (productId: string) => Promise<void>;
     updateQuantity: (productId: string, quantity: number) => Promise<void>;
     clearCart: () => Promise<void>;
@@ -73,9 +73,13 @@ export function TakeoutCartProvider({ children }: { children: ReactNode }) {
         setRestaurantId(newRestaurantId);
     };
 
-    const addItem = async (product: Product, quantity: number) => {
-        // Check if item already exists in cart
-        const existingItemIndex = items.findIndex(item => item.product_id === product.id);
+    const addItem = async (product: Product, quantity: number, modifiers: SelectedModifier[] = []) => {
+        // Check if item already exists in cart with SAME modifiers
+        const existingItemIndex = items.findIndex(item =>
+            item.product_id === product.id &&
+            JSON.stringify(item.modifiers?.sort((a, b) => a.id.localeCompare(b.id))) ===
+            JSON.stringify(modifiers.sort((a, b) => a.id.localeCompare(b.id)))
+        );
 
         if (existingItemIndex >= 0) {
             // Update quantity
@@ -89,7 +93,7 @@ export function TakeoutCartProvider({ children }: { children: ReactNode }) {
                 name: product.name,
                 price: product.price,
                 quantity,
-                modifiers: [] // TODO: Add modifier support if needed
+                modifiers
             };
             setItems([...items, newItem]);
         }

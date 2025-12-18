@@ -17,12 +17,13 @@ interface CartItem {
 
 interface DigitalMenuInterfaceProps {
     restaurantId: string;
-    tableId: string;
-    mode?: 'guest' | 'waiter';
+    tableId?: string; // Optional for takeout
+    mode?: 'guest' | 'waiter' | 'takeout';
     sessionId?: string; // Optional pre-supplied session ID
+    onCheckout?: (cart: CartItem[]) => void;
 }
 
-export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'guest', sessionId: initialSessionId }: DigitalMenuInterfaceProps) {
+export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'guest', sessionId: initialSessionId, onCheckout }: DigitalMenuInterfaceProps) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
 
@@ -55,13 +56,16 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
 
     useEffect(() => {
-        if (!restaurantId || !tableId) return;
+        if (!restaurantId) return;
+        if (mode !== 'takeout' && !tableId) return;
 
         const loadData = async () => {
             try {
                 // Fetch static data
-                const tableData = await getTableDetails(restaurantId, tableId);
-                setTable(tableData);
+                if (tableId) {
+                    const tableData = await getTableDetails(restaurantId, tableId);
+                    setTable(tableData);
+                }
 
                 // Realtime subscriptions
                 const unsubCats = subscribeToGuestCategories(restaurantId, (data) => {
@@ -77,20 +81,27 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                     setBranding(config.branding);
                 });
 
-                const unsubSession = subscribeToActiveSession(restaurantId, tableId, (items, total, sessionId) => {
-                    setSessionItems(items);
-                    setSessionTotal(total);
-                    setCurrentSessionId(sessionId);
-                });
-
-                setLoading(false);
-
-                return () => {
-                    unsubCats();
-                    unsubProds();
-                    unsubConfig();
-                    if (unsubSession) unsubSession();
-                };
+                if (tableId) {
+                    const unsubSession = subscribeToActiveSession(restaurantId, tableId, (items, total, sessionId) => {
+                        setSessionItems(items);
+                        setSessionTotal(total);
+                        setCurrentSessionId(sessionId);
+                    });
+                    setLoading(false);
+                    return () => {
+                        unsubCats();
+                        unsubProds();
+                        unsubConfig();
+                        if (unsubSession) unsubSession();
+                    };
+                } else {
+                    setLoading(false);
+                    return () => {
+                        unsubCats();
+                        unsubProds();
+                        unsubConfig();
+                    };
+                }
             } catch (e) {
                 console.error(e);
                 setLoading(false);
@@ -210,6 +221,10 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
     };
 
     const handleSendOrder = () => {
+        if (mode === 'takeout') {
+            if (onCheckout) onCheckout(cart);
+            return;
+        }
         // Open preview modal instead of sending directly
         setPreviewModalVisible(true);
     };
@@ -306,28 +321,34 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                         />
                     ) : (
                         <>
-                            <Text className="text-sm font-bold text-gray-400 uppercase tracking-widest">MENU</Text>
-                            <Text className="text-2xl font-extrabold text-gray-900">{table?.name || 'Table'}</Text>
+                            <Text className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+                                {mode === 'takeout' ? 'PEDIDO PARA LLEVAR' : 'MENU'}
+                            </Text>
+                            <Text className="text-2xl font-extrabold text-gray-900">
+                                {mode === 'takeout' ? 'Llevar' : (table?.name || 'Table')}
+                            </Text>
                         </>
                     )}
                 </View>
-                {/* Tabs */}
-                <View className="flex-row bg-gray-100 p-1 rounded-xl">
-                    <TouchableOpacity
-                        onPress={() => setActiveTab('menu')}
-                        className={`px-4 py-2 rounded-lg ${activeTab === 'menu' ? 'bg-white shadow-sm' : ''}`}
-                        style={activeTab === 'menu' && branding?.primary_color ? { borderBottomWidth: 2, borderBottomColor: branding.primary_color } : {}}
-                    >
-                        <Utensils size={18} color={activeTab === 'menu' && branding?.primary_color ? branding.primary_color : (activeTab === 'menu' ? 'black' : 'gray')} />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => setActiveTab('bill')}
-                        className={`px-4 py-2 rounded-lg ${activeTab === 'bill' ? 'bg-white shadow-sm' : ''}`}
-                        style={activeTab === 'bill' && branding?.primary_color ? { borderBottomWidth: 2, borderBottomColor: branding.primary_color } : {}}
-                    >
-                        <FileText size={18} color={activeTab === 'bill' && branding?.primary_color ? branding.primary_color : (activeTab === 'bill' ? 'black' : 'gray')} />
-                    </TouchableOpacity>
-                </View>
+                {/* Tabs - Only show if not takeout (takeout doesn't have active bill usually) */}
+                {mode !== 'takeout' && (
+                    <View className="flex-row bg-gray-100 p-1 rounded-xl">
+                        <TouchableOpacity
+                            onPress={() => setActiveTab('menu')}
+                            className={`px-4 py-2 rounded-lg ${activeTab === 'menu' ? 'bg-white shadow-sm' : ''}`}
+                            style={activeTab === 'menu' && branding?.primary_color ? { borderBottomWidth: 2, borderBottomColor: branding.primary_color } : {}}
+                        >
+                            <Utensils size={18} color={activeTab === 'menu' && branding?.primary_color ? branding.primary_color : (activeTab === 'menu' ? 'black' : 'gray')} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            onPress={() => setActiveTab('bill')}
+                            className={`px-4 py-2 rounded-lg ${activeTab === 'bill' ? 'bg-white shadow-sm' : ''}`}
+                            style={activeTab === 'bill' && branding?.primary_color ? { borderBottomWidth: 2, borderBottomColor: branding.primary_color } : {}}
+                        >
+                            <FileText size={18} color={activeTab === 'bill' && branding?.primary_color ? branding.primary_color : (activeTab === 'bill' ? 'black' : 'gray')} />
+                        </TouchableOpacity>
+                    </View>
+                )}
             </View>
 
             {/* TAB CONTENT: MENU */}
@@ -382,8 +403,8 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                                     <View className="flex-row justify-between items-center mt-3">
                                         <Text className="text-base font-semibold text-gray-900" style={branding?.primary_color ? { color: branding.primary_color } : {}}>${item.price.toFixed(2)}</Text>
 
-                                        {/* Ordering Controls - Check allow_guest_ordering unless mode is waiter (waiters always order) */}
-                                        {(allowOrdering || mode === 'waiter') && (
+                                        {/* Ordering Controls - Check allow_guest_ordering unless mode is waiter or takeout (takeout always orders) */}
+                                        {(allowOrdering || mode === 'waiter' || mode === 'takeout') && (
                                             getQuantity(item.id) === 0 ? (
                                                 <TouchableOpacity
                                                     onPress={() => addToCart(item)}
@@ -432,7 +453,7 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                     />
 
                     {/* Floating Action Bar (Cart) */}
-                    {(allowOrdering || mode === 'waiter') && cartCount > 0 && (
+                    {(allowOrdering || mode === 'waiter' || mode === 'takeout') && cartCount > 0 && (
                         <View className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100" style={{ paddingBottom: insets.bottom + 10 }}>
                             <TouchableOpacity
                                 onPress={handleSendOrder}
@@ -443,7 +464,9 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                                     <View className="bg-white/20 px-2 py-1 rounded text-xs mr-3">
                                         <Text className="text-white font-bold">{cartCount}</Text>
                                     </View>
-                                    <Text className="text-white font-bold text-lg">Send to Kitchen</Text>
+                                    <Text className="text-white font-bold text-lg">
+                                        {mode === 'takeout' ? 'Ver Carrito / Checkout' : 'Send to Kitchen'}
+                                    </Text>
                                 </View>
                                 <Text className="text-white font-bold text-lg">${cartTotal.toFixed(2)}</Text>
                             </TouchableOpacity>
