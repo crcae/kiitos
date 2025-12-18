@@ -107,6 +107,14 @@ export default function IndexScreen() {
                     <Text style={styles.cardTitle}>Cashier</Text>
                     <Text style={styles.cardDesc}>Payments</Text>
                 </TouchableOpacity>
+
+                <TouchableOpacity
+                    style={[styles.card, { backgroundColor: '#EA580C' }]}
+                    onPress={() => router.push('/(tabs)/marketplace')}
+                >
+                    <Text style={styles.cardTitle}>Marketplace</Text>
+                    <Text style={styles.cardDesc}>Pre-order (Customer)</Text>
+                </TouchableOpacity>
             </View>
 
             <TouchableOpacity style={styles.seedButton} onPress={handleSeed}>

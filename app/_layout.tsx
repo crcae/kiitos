@@ -6,10 +6,10 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { auth } from '../src/services/firebaseConfig';
 import { BillProvider } from '../src/context/BillContext';
 import { GuestProvider } from '../src/context/GuestContext';
-import { AuthProvider } from '../src/context/AuthContext';
+import { AuthProvider, useAuth } from '../src/context/AuthContext';
 import { TenantProvider } from '../src/context/TenantContext';
 import { TakeoutCartProvider } from '../src/context/TakeoutCartContext';
-import { useAuth } from '../src/context/AuthContext';
+import { MarketplaceCartProvider } from '../src/context/MarketplaceCartContext';
 import { useSegments, useRouter, Stack } from 'expo-router';
 import '../global.css';
 
@@ -40,7 +40,9 @@ export default function Layout() {
                     <GuestProvider>
                         <BillProvider>
                             <TakeoutCartProvider>
+
                                 <RootRouteGuard />
+                                <MarketplaceCartProvider>
                                 <Stack screenOptions={{ headerShown: false }}>
                                     <Stack.Screen name="index" />
                                     <Stack.Screen name="login" />
@@ -48,6 +50,7 @@ export default function Layout() {
                                     <Stack.Screen name="onboarding" options={{ gestureEnabled: false, headerShown: false }} />
                                 </Stack>
                                 <StatusBar style="auto" />
+                                </MarketplaceCartProvider>
                             </TakeoutCartProvider>
                         </BillProvider>
                     </GuestProvider>
