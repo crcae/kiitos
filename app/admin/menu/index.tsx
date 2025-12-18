@@ -14,11 +14,13 @@ import {
 import BrandingColorPicker from '../../../src/components/BrandingColorPicker';
 import { RestaurantSettings } from '../../../src/types/firestore';
 import { uploadImage } from '../../../src/services/storage';
-import { Product, Category, ProductModifier } from '../../../src/types/firestore';
+import { Product, Category, ModifierGroup, ModifierOption } from '../../../src/types/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { useRouter } from 'expo-router';
+import { useAuth } from '../../../src/context/AuthContext';
+import { useRestaurant } from '../../../src/hooks/useRestaurant';
 
 // Helper component for Tab Button
 const TabButton = ({ title, active, onPress }: { title: string; active: boolean; onPress: () => void }) => (
@@ -32,6 +34,16 @@ const TabButton = ({ title, active, onPress }: { title: string; active: boolean;
 
 export default function MenuManagementScreen() {
     const router = useRouter();
+    const { user } = useAuth();
+    const { restaurant } = useRestaurant();
+    const restaurantId = user?.restaurantId;
+
+    // Redirect if no restaurantId (should be handled by layout guard but safe check)
+    useEffect(() => {
+        if (!restaurantId && user) {
+            // alert('Error: No associated restaurant found.');
+        }
+    }, [restaurantId, user]);
     const insets = useSafeAreaInsets();
     // Removed activeTab since we show both
     const [categories, setCategories] = useState<Category[]>([]);
@@ -65,19 +77,21 @@ export default function MenuManagementScreen() {
     const [prodPrice, setProdPrice] = useState('');
     // prodCategory is now derived from selectedCategoryId for new products
     const [prodImage, setProdImage] = useState<string | null>(null);
-    // Simple modifier implementation: comma separated strings for now or just generic
-    const [prodModifiersText, setProdModifiersText] = useState('');
+    // Structured modifiers state
+    const [prodModifiers, setProdModifiers] = useState<ModifierGroup[]>([]);
 
     useEffect(() => {
-        const unsubscribeCategories = subscribeToCategories((data) => {
+        if (!restaurantId) return;
+
+        const unsubscribeCategories = subscribeToCategories(restaurantId, (data) => {
             setCategories(data);
         });
 
-        const unsubscribeProducts = subscribeToProducts((data) => {
+        const unsubscribeProducts = subscribeToProducts(restaurantId, (data) => {
             setProducts(data);
         });
 
-        const unsubscribeConfig = subscribeToRestaurantConfig('kiitos-main', (config) => {
+        const unsubscribeConfig = subscribeToRestaurantConfig(restaurantId, (config) => {
             setAllowGuestOrdering(config.allow_guest_ordering ?? false);
             setEnableTakeout(config.enable_takeout ?? false);
             if (config.branding) {
@@ -91,7 +105,7 @@ export default function MenuManagementScreen() {
             unsubscribeProducts();
             unsubscribeConfig();
         };
-    }, []);
+    }, [restaurantId]);
 
     const pickImage = async (setFunction: (uri: string) => void) => {
         // No permissions request is necessary for launching the image library
@@ -122,7 +136,7 @@ export default function MenuManagementScreen() {
             if (catImage && catImage !== editingCategory?.image_url) {
                 try {
                     const filename = `categories/${Date.now()}.jpg`;
-                    imageUrl = await uploadImage(catImage, `restaurants/kiitos-main/${filename}`);
+                    imageUrl = await uploadImage(catImage, `restaurants/${restaurantId}/${filename}`);
                 } catch (uploadError: any) {
                     console.error("Upload failed", uploadError);
                     Alert.alert('Error', 'No se pudo subir la imagen. Inténtalo de nuevo.');
@@ -135,9 +149,9 @@ export default function MenuManagementScreen() {
             if (imageUrl) categoryData.image_url = imageUrl;
 
             if (editingCategory) {
-                await updateCategory(editingCategory.id, categoryData);
+                await updateCategory(restaurantId, editingCategory.id, categoryData);
             } else {
-                await createCategory(categoryData);
+                await createCategory(restaurantId, categoryData);
             }
             // Realtime listener updates UI
             setCategoryModalVisible(false);
@@ -170,12 +184,63 @@ export default function MenuManagementScreen() {
 
     const handleDeleteCategory = (id: string) => {
         confirmDelete('Confirm', 'Delete this category?', async () => {
-            await deleteCategory(id);
+            await deleteCategory(restaurantId, id);
             if (selectedCategoryId === id) setSelectedCategoryId(null);
         });
     };
 
     // --- Products Handlers ---
+
+    // --- Modifiers Helpers ---
+
+    const addModifierGroup = () => {
+        setProdModifiers([...prodModifiers, {
+            id: Date.now().toString(),
+            name: '',
+            min_selections: 0,
+            max_selections: 1,
+            required: false,
+            options: []
+        }]);
+    };
+
+    const updateModifierGroup = (index: number, field: keyof ModifierGroup, value: any) => {
+        const newModifiers = [...prodModifiers];
+        newModifiers[index] = { ...newModifiers[index], [field]: value };
+        setProdModifiers(newModifiers);
+    };
+
+    const removeModifierGroup = (index: number) => {
+        const newModifiers = [...prodModifiers];
+        newModifiers.splice(index, 1);
+        setProdModifiers(newModifiers);
+    };
+
+    const addOptionToGroup = (groupIndex: number) => {
+        const newModifiers = [...prodModifiers];
+        newModifiers[groupIndex].options.push({
+            id: Date.now().toString(),
+            name: '',
+            price: 0,
+            available: true
+        });
+        setProdModifiers(newModifiers);
+    };
+
+    const updateOptionInGroup = (groupIndex: number, optionIndex: number, field: keyof ModifierOption, value: any) => {
+        const newModifiers = [...prodModifiers];
+        const group = newModifiers[groupIndex];
+        const option = group.options[optionIndex];
+        // @ts-ignore
+        group.options[optionIndex] = { ...option, [field]: value };
+        setProdModifiers(newModifiers);
+    };
+
+    const removeOptionFromGroup = (groupIndex: number, optionIndex: number) => {
+        const newModifiers = [...prodModifiers];
+        newModifiers[groupIndex].options.splice(optionIndex, 1);
+        setProdModifiers(newModifiers);
+    };
 
     const handleSaveProduct = async () => {
         // Use selectedCategoryId if creating new, or the product's existing category id (though we usually edit in context)
@@ -187,11 +252,7 @@ export default function MenuManagementScreen() {
             return;
         }
 
-        const modifiers: ProductModifier[] = prodModifiersText.split(',').filter(m => m.trim()).map((m, idx) => ({
-            id: `${Date.now()}-${idx}`,
-            name: m.trim(),
-            price_adjustment: 0 // Default 0 for simple list
-        }));
+        const modifiers = prodModifiers;
 
         try {
             setUploading(true);
@@ -200,7 +261,7 @@ export default function MenuManagementScreen() {
             if (prodImage && prodImage !== editingProduct?.image_url) {
                 try {
                     const filename = `products/${Date.now()}.jpg`;
-                    imageUrl = await uploadImage(prodImage, `restaurants/kiitos-main/${filename}`);
+                    imageUrl = await uploadImage(prodImage, `restaurants/${restaurantId}/${filename}`);
                 } catch (uploadError: any) {
                     console.error("Upload failed", uploadError);
                     Alert.alert('Error', 'No se pudo subir la imagen. Inténtalo de nuevo.');
@@ -220,9 +281,9 @@ export default function MenuManagementScreen() {
             if (imageUrl) productData.image_url = imageUrl;
 
             if (editingProduct) {
-                await updateProduct(editingProduct.id, productData);
+                await updateProduct(restaurantId, editingProduct.id, productData);
             } else {
-                await createProduct(productData);
+                await createProduct(restaurantId, productData);
             }
             setProductModalVisible(false);
             resetForms();
@@ -236,7 +297,7 @@ export default function MenuManagementScreen() {
 
     const handleDeleteProduct = (id: string) => {
         confirmDelete('Confirm', 'Delete this product?', async () => {
-            await deleteProduct(id);
+            await deleteProduct(restaurantId, id);
         });
     };
 
@@ -248,7 +309,7 @@ export default function MenuManagementScreen() {
         setProdName('');
         setProdDesc('');
         setProdPrice('');
-        setProdModifiersText('');
+        setProdModifiers([]);
         setProdImage(null);
     };
 
@@ -264,7 +325,7 @@ export default function MenuManagementScreen() {
         setProdName(prod.name);
         setProdDesc(prod.description || '');
         setProdPrice(prod.price.toString());
-        setProdModifiersText(prod.modifiers?.map(m => m.name).join(', ') || '');
+        setProdModifiers(prod.modifiers || []);
         setProdImage(prod.image_url || null);
         setProductModalVisible(true);
     };
@@ -272,7 +333,7 @@ export default function MenuManagementScreen() {
     const toggleGuestOrdering = async (val: boolean) => {
         setAllowGuestOrdering(val);
         try {
-            await updateRestaurantConfig('kiitos-main', { allow_guest_ordering: val });
+            await updateRestaurantConfig(restaurantId, { allow_guest_ordering: val });
         } catch (e) {
             console.error(e);
             Alert.alert('Error', 'Failed to update config');
@@ -283,7 +344,7 @@ export default function MenuManagementScreen() {
     const toggleTakeout = async (val: boolean) => {
         setEnableTakeout(val);
         try {
-            await updateRestaurantConfig('kiitos-main', { enable_takeout: val });
+            await updateRestaurantConfig(restaurantId, { enable_takeout: val });
         } catch (e) {
             console.error(e);
             Alert.alert('Error', 'Failed to update config');
@@ -300,7 +361,7 @@ export default function MenuManagementScreen() {
             if (brandingLogo && !brandingLogo.startsWith('http')) {
                 try {
                     const filename = `branding/logo_${Date.now()}.jpg`;
-                    logoUrl = await uploadImage(brandingLogo, `restaurants/kiitos-main/${filename}`);
+                    logoUrl = await uploadImage(brandingLogo, `restaurants/${restaurantId}/${filename}`);
                 } catch (uploadError: any) {
                     console.error("Upload failed", uploadError);
                     Alert.alert('Error', 'No se pudo subir el logo. Inténtalo de nuevo.');
@@ -314,7 +375,7 @@ export default function MenuManagementScreen() {
                 primary_color: brandingColor,
             };
 
-            await updateRestaurantConfig('kiitos-main', { branding: brandingData });
+            await updateRestaurantConfig(restaurantId, { branding: brandingData });
             setBrandingModalVisible(false);
             Alert.alert('Éxito', 'Configuración de marca actualizada');
         } catch (e: any) {
@@ -338,7 +399,12 @@ export default function MenuManagementScreen() {
             {/* Header / Settings Bar */}
             <View className="px-6 py-4 border-b border-slate-800 bg-slate-900">
                 <View className="flex-row justify-between items-center mb-4">
-                    <Text className="text-xl font-bold text-white">Menu Manager</Text>
+                    <View>
+                        <Text className="text-xs text-orange-500 font-bold uppercase tracking-wider mb-1">
+                            {restaurant?.name || restaurant?.id || user?.restaurantId || 'Cargando...'}
+                        </Text>
+                        <Text className="text-xl font-bold text-white">Menu Manager</Text>
+                    </View>
 
                     {/* Preview Buttons */}
                     <View className="flex-row gap-2">
@@ -346,8 +412,9 @@ export default function MenuManagementScreen() {
                             className="bg-slate-800 p-2 rounded-lg border border-slate-700 flex-row items-center"
                             onPress={() => {
                                 // Navigate to the table preview
-                                // Assuming 'table-1' or a generic preview route
-                                router.push('/menu/kiitos-main/table-1');
+                                if (restaurantId) {
+                                    router.push(`/menu/${restaurantId}/table-1` as any);
+                                }
                             }}
                         >
                             <View className="mr-2"><Text>👁️</Text></View>
@@ -363,7 +430,9 @@ export default function MenuManagementScreen() {
                         <TouchableOpacity
                             className="bg-slate-800 p-2 rounded-lg border border-slate-700 flex-row items-center"
                             onPress={() => {
-                                router.push('/takeout/kiitos-main');
+                                if (restaurantId) {
+                                    router.push(`/takeout/${restaurantId}` as any);
+                                }
                             }}
                         >
                             <View className="mr-2"><Text>👁️</Text></View>
@@ -424,7 +493,7 @@ export default function MenuManagementScreen() {
                         {/* QR Placeholder - In real app use react-native-qrcode-svg */}
                         <View className="w-64 h-64 bg-white items-center justify-center rounded-xl mb-6 overflow-hidden">
                             <QRCode
-                                value="https://kiitos.app/takeout/kiitos-main"
+                                value={`https://kiitos.app/takeout/${restaurantId}`}
                                 size={250}
                             />
                         </View>
@@ -627,12 +696,49 @@ export default function MenuManagementScreen() {
 
                                 {/* Removed Category Picker - Implicitly uses selectedCategoryId */}
 
-                                <AirbnbInput
-                                    label="Modifiers (comma separated)"
-                                    value={prodModifiersText}
-                                    onChangeText={setProdModifiersText}
-                                    placeholder="Cheese, Bacon, No Pickle"
-                                />
+                                <View className="mt-4 mb-4">
+                                    <Text className="text-sm font-bold text-slate-700 mb-2">Customizations</Text>
+                                    {prodModifiers.map((group, gIdx) => (
+                                        <View key={group.id} className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                            <View className="flex-row justify-between items-center mb-2">
+                                                <Text className="font-bold text-slate-700">Group {gIdx + 1}</Text>
+                                                <TouchableOpacity onPress={() => removeModifierGroup(gIdx)}>
+                                                    <Trash2 size={16} color={colors.chile} />
+                                                </TouchableOpacity>
+                                            </View>
+                                            <AirbnbInput label="Label (e.g. Choose Sauce)" value={group.name} onChangeText={(t) => updateModifierGroup(gIdx, 'name', t)} />
+                                            <View className="flex-row gap-2">
+                                                <View className="flex-1">
+                                                    <AirbnbInput label="Min" value={group.min_selections.toString()} onChangeText={(t) => updateModifierGroup(gIdx, 'min_selections', parseInt(t) || 0)} keyboardType="numeric" />
+                                                </View>
+                                                <View className="flex-1">
+                                                    <AirbnbInput label="Max" value={group.max_selections.toString()} onChangeText={(t) => updateModifierGroup(gIdx, 'max_selections', parseInt(t) || 0)} keyboardType="numeric" />
+                                                </View>
+                                            </View>
+
+                                            <Text className="text-xs font-bold text-slate-500 mt-2 mb-1">Options</Text>
+                                            {group.options.map((opt, oIdx) => (
+                                                <View key={opt.id} className="flex-row gap-2 mb-2 items-center">
+                                                    <View className="flex-[2]">
+                                                        <AirbnbInput label="Option Name" placeholder="Option Name" value={opt.name} onChangeText={(t) => updateOptionInGroup(gIdx, oIdx, 'name', t)} />
+                                                    </View>
+                                                    <View className="flex-1">
+                                                        <AirbnbInput label="Price" placeholder="Price" value={opt.price.toString()} onChangeText={(t) => updateOptionInGroup(gIdx, oIdx, 'price', parseFloat(t) || 0)} keyboardType="numeric" />
+                                                    </View>
+                                                    <TouchableOpacity onPress={() => removeOptionFromGroup(gIdx, oIdx)} className="mt-2">
+                                                        <Trash2 size={16} color={colors.chile} />
+                                                    </TouchableOpacity>
+                                                </View>
+                                            ))}
+                                            <TouchableOpacity onPress={() => addOptionToGroup(gIdx)} className="mt-2 bg-slate-200 p-2 rounded items-center">
+                                                <Text className="text-xs font-bold text-slate-600">+ Add Option</Text>
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))}
+                                    <TouchableOpacity onPress={addModifierGroup} className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 items-center">
+                                        <Text className="text-indigo-600 font-bold">+ Add Modifier Group</Text>
+                                    </TouchableOpacity>
+                                </View>
 
                                 <TouchableOpacity onPress={() => pickImage(setProdImage)} className="mb-4 mt-2 items-center justify-center h-32 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300">
                                     {prodImage ? (
@@ -665,12 +771,49 @@ export default function MenuManagementScreen() {
 
                                     {/* Removed Category Picker - Implicitly uses selectedCategoryId */}
 
-                                    <AirbnbInput
-                                        label="Modifiers (comma separated)"
-                                        value={prodModifiersText}
-                                        onChangeText={setProdModifiersText}
-                                        placeholder="Cheese, Bacon, No Pickle"
-                                    />
+                                    <View className="mt-4 mb-4">
+                                        <Text className="text-sm font-bold text-slate-700 mb-2">Customizations</Text>
+                                        {prodModifiers.map((group, gIdx) => (
+                                            <View key={group.id} className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                                                <View className="flex-row justify-between items-center mb-2">
+                                                    <Text className="font-bold text-slate-700">Group {gIdx + 1}</Text>
+                                                    <TouchableOpacity onPress={() => removeModifierGroup(gIdx)}>
+                                                        <Trash2 size={16} color={colors.chile} />
+                                                    </TouchableOpacity>
+                                                </View>
+                                                <AirbnbInput label="Label (e.g. Choose Sauce)" value={group.name} onChangeText={(t) => updateModifierGroup(gIdx, 'name', t)} />
+                                                <View className="flex-row gap-2">
+                                                    <View className="flex-1">
+                                                        <AirbnbInput label="Min" value={group.min_selections.toString()} onChangeText={(t) => updateModifierGroup(gIdx, 'min_selections', parseInt(t) || 0)} keyboardType="numeric" />
+                                                    </View>
+                                                    <View className="flex-1">
+                                                        <AirbnbInput label="Max" value={group.max_selections.toString()} onChangeText={(t) => updateModifierGroup(gIdx, 'max_selections', parseInt(t) || 0)} keyboardType="numeric" />
+                                                    </View>
+                                                </View>
+
+                                                <Text className="text-xs font-bold text-slate-500 mt-2 mb-1">Options</Text>
+                                                {group.options.map((opt, oIdx) => (
+                                                    <View key={opt.id} className="flex-row gap-2 mb-2 items-center">
+                                                        <View className="flex-[2]">
+                                                            <AirbnbInput label="Option Name" placeholder="Option Name" value={opt.name} onChangeText={(t) => updateOptionInGroup(gIdx, oIdx, 'name', t)} />
+                                                        </View>
+                                                        <View className="flex-1">
+                                                            <AirbnbInput label="Price" placeholder="Price" value={opt.price.toString()} onChangeText={(t) => updateOptionInGroup(gIdx, oIdx, 'price', parseFloat(t) || 0)} keyboardType="numeric" />
+                                                        </View>
+                                                        <TouchableOpacity onPress={() => removeOptionFromGroup(gIdx, oIdx)} className="mt-2">
+                                                            <Trash2 size={16} color={colors.chile} />
+                                                        </TouchableOpacity>
+                                                    </View>
+                                                ))}
+                                                <TouchableOpacity onPress={() => addOptionToGroup(gIdx)} className="mt-2 bg-slate-200 p-2 rounded items-center">
+                                                    <Text className="text-xs font-bold text-slate-600">+ Add Option</Text>
+                                                </TouchableOpacity>
+                                            </View>
+                                        ))}
+                                        <TouchableOpacity onPress={addModifierGroup} className="bg-indigo-50 p-3 rounded-lg border border-indigo-100 items-center">
+                                            <Text className="text-indigo-600 font-bold">+ Add Modifier Group</Text>
+                                        </TouchableOpacity>
+                                    </View>
 
                                     <TouchableOpacity onPress={() => pickImage(setProdImage)} className="mb-4 mt-2 items-center justify-center h-32 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300">
                                         {prodImage ? (

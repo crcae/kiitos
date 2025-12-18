@@ -11,8 +11,12 @@ import {
     generateRandomPin
 } from '../../../src/services/staff';
 import { StaffMember, StaffRole } from '../../../src/types/firestore';
+import { useRestaurant } from '../../../src/hooks/useRestaurant';
 
-const RESTAURANT_ID = 'kiitos-main'; // TODO: Get from auth context
+import { useAuth } from '../../../src/context/AuthContext';
+import { useRouter } from 'expo-router';
+import { useRef } from 'react';
+import QRCode from 'react-native-qrcode-svg';
 
 // Role badge colors
 const ROLE_COLORS: Record<StaffRole, { bg: string; text: string; label: string }> = {
@@ -24,6 +28,11 @@ const ROLE_COLORS: Record<StaffRole, { bg: string; text: string; label: string }
 
 export default function StaffManagementScreen() {
     const insets = useSafeAreaInsets();
+    const router = useRouter();
+    const { user } = useAuth();
+    const { restaurant } = useRestaurant();
+    const restaurantId = user?.restaurantId || 'kiitos-main';
+
     const [staff, setStaff] = useState<StaffMember[]>([]);
     const [modalVisible, setModalVisible] = useState(false);
     const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
@@ -32,12 +41,15 @@ export default function StaffManagementScreen() {
     const [name, setName] = useState('');
     const [role, setRole] = useState<StaffRole>('waiter');
     const [pin, setPin] = useState('');
+    const [qrModalVisible, setQrModalVisible] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        const unsubscribe = subscribeToStaff(RESTAURANT_ID, setStaff);
+        if (!restaurantId) return;
+        const unsubscribe = subscribeToStaff(restaurantId, setStaff);
         return () => unsubscribe();
-    }, []);
+    }, [restaurantId]);
 
     const resetForm = () => {
         setEditingStaff(null);
@@ -68,13 +80,13 @@ export default function StaffManagementScreen() {
         try {
             setSaving(true);
             if (editingStaff) {
-                await updateStaffMember(RESTAURANT_ID, editingStaff.id, {
+                await updateStaffMember(restaurantId, editingStaff.id, {
                     name,
                     role,
                     pin_code: pin
                 });
             } else {
-                await createStaffMember(RESTAURANT_ID, {
+                await createStaffMember(restaurantId, {
                     name,
                     role,
                     pin_code: pin,
@@ -110,7 +122,7 @@ export default function StaffManagementScreen() {
 
         if (confirm) {
             try {
-                await toggleStaffActive(RESTAURANT_ID, member.id, !member.active);
+                await toggleStaffActive(restaurantId, member.id, !member.active);
             } catch (e) {
                 console.error(e);
                 Alert.alert('Error', 'No se pudo actualizar el estado');
@@ -186,18 +198,59 @@ export default function StaffManagementScreen() {
         <View className="flex-1 bg-slate-900" style={{ paddingTop: insets.top }}>
             {/* Header */}
             <View className="px-6 py-4 border-b border-slate-800 flex-row justify-between items-center">
-                <Text className="text-xl font-bold text-white">Gestión de Personal</Text>
-                <TouchableOpacity
-                    onPress={() => {
-                        resetForm();
-                        setModalVisible(true);
-                    }}
-                    className="bg-indigo-600 px-4 py-2 rounded-lg flex-row items-center"
-                >
-                    <Plus size={16} color={colors.white} />
-                    <Text className="text-white font-semibold ml-2">Nuevo</Text>
-                </TouchableOpacity>
+                <View>
+                    <Text className="text-xs text-orange-500 font-bold uppercase tracking-wider mb-1">
+                        {restaurant?.name || restaurant?.id || user?.restaurantId || 'Cargando...'}
+                    </Text>
+                    <Text className="text-xl font-bold text-white">Gestión de Personal</Text>
+                </View>
+                <View className="flex-row gap-2">
+                    <TouchableOpacity
+                        onPress={() => setQrModalVisible(true)}
+                        className="bg-slate-800 p-2 px-3 rounded-lg border border-slate-700 flex-row items-center"
+                    >
+                        <Text className="text-2xl mr-2">🔳</Text>
+                        <Text className="text-slate-300 font-bold text-xs">QR Acceso</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        onPress={() => {
+                            resetForm();
+                            setModalVisible(true);
+                        }}
+                        className="bg-indigo-600 px-4 py-2 rounded-lg flex-row items-center"
+                    >
+                        <Plus size={20} color="#fff" />
+                        <Text className="text-white font-bold ml-2">Nuevo</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
+
+            {/* QR Modal */}
+            <Modal visible={qrModalVisible} transparent animationType="fade">
+                <View className="flex-1 justify-center items-center bg-black/80 p-4">
+                    <View className="bg-white p-6 rounded-2xl items-center w-full max-w-sm">
+                        <Text className="text-xl font-bold mb-2 text-stone-900">QR de Acceso Personal</Text>
+                        <Text className="text-stone-500 text-sm mb-6 text-center">Imprime esto para que tu staff inicie sesión escaneándolo.</Text>
+
+                        <View className="bg-white p-4 rounded-xl mb-6 border border-stone-200">
+                            {restaurantId && (
+                                <QRCode
+                                    value={`${Platform.OS === 'web' ? window.location.origin : 'https://kiitos.app'}/login/staff?restaurantId=${restaurantId}`}
+                                    size={200}
+                                />
+                            )}
+                        </View>
+
+                        <TouchableOpacity
+                            onPress={() => setQrModalVisible(false)}
+                            className="bg-stone-900 w-full py-3 rounded-xl"
+                        >
+                            <Text className="text-white text-center font-bold">Cerrar</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
 
             <ScrollView className="flex-1 p-6">
                 {/* Active Staff */}
