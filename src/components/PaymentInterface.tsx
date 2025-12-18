@@ -11,15 +11,27 @@ import { db } from '../services/firebaseConfig';
 type SplitMode = 'full' | 'items' | 'equal' | 'custom';
 
 interface PaymentInterfaceProps {
-    sessionId: string;
+    sessionId?: string; // Optional if localSession is provided
     restaurantId: string;
     onClose?: () => void;
     onPaymentSuccess?: () => void;
     mode?: 'guest' | 'waiter';
+    localSession?: Session; // Optional: use this instead of subscribing to a session
+    onConfirmPayment?: (amount: number, tip: number, selectedItems?: any[]) => Promise<void>; // Optional: custom handler for payment
+    hideSplitModes?: boolean; // Optional: hide splitting UI
 }
 
-export default function PaymentInterface({ sessionId, restaurantId, onClose, onPaymentSuccess, mode = 'guest' }: PaymentInterfaceProps) {
-    const [session, setSession] = useState<Session | null>(null);
+export default function PaymentInterface({
+    sessionId,
+    restaurantId,
+    onClose,
+    onPaymentSuccess,
+    mode = 'guest',
+    localSession,
+    onConfirmPayment,
+    hideSplitModes = false
+}: PaymentInterfaceProps) {
+    const [session, setSession] = useState<Session | null>(localSession || null);
     const [loading, setLoading] = useState(true);
     const [splitMode, setSplitMode] = useState<SplitMode>('full');
     const [selectedVirtualIds, setSelectedVirtualIds] = useState<Set<string>>(new Set());
@@ -40,7 +52,16 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
     const [useCustomTip, setUseCustomTip] = useState(false);
 
     useEffect(() => {
-        if (!sessionId || !restaurantId) return;
+        if (localSession) {
+            setSession(localSession);
+            setLoading(false);
+            return;
+        }
+
+        if (!sessionId || !restaurantId) {
+            setLoading(false);
+            return;
+        };
 
         const unsubscribe = subscribeToSession(sessionId, (data) => {
             console.log('🔄🔄🔄 [PaymentInterface] Session updated:', {
@@ -61,11 +82,14 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         }, restaurantId);
 
         return () => unsubscribe();
-    }, [sessionId, restaurantId]);
+    }, [sessionId, restaurantId, localSession]);
 
     // Load payment summary with real-time updates
     useEffect(() => {
-        if (!sessionId || !restaurantId) return;
+        if (localSession || !sessionId || !restaurantId) {
+            if (localSession) setPayments([]); // No payments history for local sessions yet
+            return;
+        }
 
         const paymentsRef = collection(db, 'restaurants', restaurantId, 'sessions', sessionId, 'payments');
         const unsubscribe = onSnapshot(paymentsRef, (snapshot) => {
@@ -76,7 +100,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         });
 
         return () => unsubscribe();
-    }, [sessionId, restaurantId]);
+    }, [sessionId, restaurantId, localSession]);
 
     const expandedItems = useMemo(() => {
         if (!session) return [];
@@ -140,7 +164,10 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
 
     const calculateAmount = (): number => {
         if (!session) return 0;
-        const remaining = calculatedTotal - (session.amount_paid || 0);
+        const totalPaid = session.amount_paid || 0;
+        const remaining = calculatedTotal - totalPaid;
+
+        if (hideSplitModes) return remaining;
 
         switch (splitMode) {
             case 'full':
@@ -249,45 +276,57 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
 
                 await recordItemPayment(
                     restaurantId,
-                    session.id,
+                    session.id || 'local',
                     selectedItems,
                     paymentMethod,
                     mode,
                     tip
                 );
             } else {
-                await recordPayment(
-                    restaurantId,
-                    session.id,
-                    amount,
-                    paymentMethod, // Use selected method
-                    mode, // 'guest' or 'waiter'
-                    tip
-                );
+                if (onConfirmPayment) {
+                    await onConfirmPayment(amount, tip);
+                } else if (session.id) {
+                    await recordPayment(
+                        restaurantId,
+                        session.id,
+                        amount,
+                        paymentMethod, // Use selected method
+                        mode, // 'guest' or 'waiter'
+                        tip
+                    );
+                }
+            }
+
+            if (onConfirmPayment) {
+                // If using custom handler, we assume success or handle failure via throw
+                if (onPaymentSuccess) onPaymentSuccess();
+                return;
             }
 
             // Reload session to get updated remaining amount
-            const updatedSession = await new Promise<Session | null>((resolve) => {
-                const unsubscribe = subscribeToSession(session.id, (data) => {
-                    resolve(data);
-                    unsubscribe();
-                }, restaurantId);
-            });
+            if (session.id) {
+                const updatedSession = await new Promise<Session | null>((resolve) => {
+                    const unsubscribe = subscribeToSession(session.id, (data) => {
+                        resolve(data);
+                        unsubscribe();
+                    }, restaurantId);
+                });
 
-            const newRemaining = updatedSession?.remaining_amount || 0;
-            const isFullyPaid = newRemaining <= 0.01;
+                const newRemaining = updatedSession?.remaining_amount || 0;
+                const isFullyPaid = newRemaining <= 0.01;
 
-            if (isFullyPaid) {
-                Alert.alert('¡Cuenta Cerrada!', `¡Pago completado! Gracias por tu visita.`);
-                if (onPaymentSuccess) onPaymentSuccess();
-                if (onClose) onClose();
-            } else {
-                Alert.alert(
-                    'Abono Registrado ✓',
-                    `Pagaste $${amount.toFixed(2)}.\n\nRestan $${newRemaining.toFixed(2)} por pagar.`,
-                    [{ text: 'OK' }]
-                );
-                if (onPaymentSuccess) onPaymentSuccess();
+                if (isFullyPaid) {
+                    Alert.alert('¡Cuenta Cerrada!', `¡Pago completado! Gracias por tu visita.`);
+                    if (onPaymentSuccess) onPaymentSuccess();
+                    if (onClose) onClose();
+                } else {
+                    Alert.alert(
+                        'Abono Registrado ✓',
+                        `Pagaste $${amount.toFixed(2)}.\n\nRestan $${newRemaining.toFixed(2)} por pagar.`,
+                        [{ text: 'OK' }]
+                    );
+                    if (onPaymentSuccess) onPaymentSuccess();
+                }
             }
         } catch (error) {
             console.error(error);
@@ -409,7 +448,11 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         <ScrollView style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>Tu Cuenta</Text>
-                <Text style={styles.subtitle}>Mesa {session.tableId?.substring(0, 8)}</Text>
+                {session.tableName ? (
+                    <Text style={styles.subtitle}>Mesa {session.tableName}</Text>
+                ) : session.tableId ? (
+                    <Text style={styles.subtitle}>Mesa {session.tableId?.substring(0, 8)}</Text>
+                ) : null}
             </View>
 
             {/* ORDER SUMMARY */}
@@ -496,40 +539,42 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
             </AirbnbCard>
 
             {/* SPLIT MODE SELECTOR */}
-            <View style={styles.modeSelector}>
-                <TouchableOpacity
-                    style={[styles.modeButton, splitMode === 'full' && styles.modeButtonActive]}
-                    onPress={() => setSplitMode('full')}
-                >
-                    <Text style={[styles.modeButtonText, splitMode === 'full' && styles.modeButtonTextActive]}>
-                        Pagar Todo
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.modeButton, splitMode === 'items' && styles.modeButtonActive]}
-                    onPress={() => setSplitMode('items')}
-                >
-                    <Text style={[styles.modeButtonText, splitMode === 'items' && styles.modeButtonTextActive]}>
-                        Por Items
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.modeButton, splitMode === 'equal' && styles.modeButtonActive]}
-                    onPress={() => setSplitMode('equal')}
-                >
-                    <Text style={[styles.modeButtonText, splitMode === 'equal' && styles.modeButtonTextActive]}>
-                        Dividir Igual
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.modeButton, splitMode === 'custom' && styles.modeButtonActive]}
-                    onPress={() => setSplitMode('custom')}
-                >
-                    <Text style={[styles.modeButtonText, splitMode === 'custom' && styles.modeButtonTextActive]}>
-                        Monto Custom
-                    </Text>
-                </TouchableOpacity>
-            </View>
+            {!hideSplitModes && (
+                <View style={styles.modeSelector}>
+                    <TouchableOpacity
+                        style={[styles.modeButton, splitMode === 'full' && styles.modeButtonActive]}
+                        onPress={() => setSplitMode('full')}
+                    >
+                        <Text style={[styles.modeButtonText, splitMode === 'full' && styles.modeButtonTextActive]}>
+                            Pagar Todo
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.modeButton, splitMode === 'items' && styles.modeButtonActive]}
+                        onPress={() => setSplitMode('items')}
+                    >
+                        <Text style={[styles.modeButtonText, splitMode === 'items' && styles.modeButtonTextActive]}>
+                            Por Items
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.modeButton, splitMode === 'equal' && styles.modeButtonActive]}
+                        onPress={() => setSplitMode('equal')}
+                    >
+                        <Text style={[styles.modeButtonText, splitMode === 'equal' && styles.modeButtonTextActive]}>
+                            Dividir Igual
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.modeButton, splitMode === 'custom' && styles.modeButtonActive]}
+                        onPress={() => setSplitMode('custom')}
+                    >
+                        <Text style={[styles.modeButtonText, splitMode === 'custom' && styles.modeButtonTextActive]}>
+                            Monto Custom
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {/* EQUAL SPLIT INPUT */}
             {splitMode === 'equal' && (
