@@ -1,4 +1,4 @@
-import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp, query, where, getDocs, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { PickupOrder, PickupOrderItem, PickupOrderStatus, PickupTimeOption } from '../types/firestore';
 
@@ -116,4 +116,24 @@ export const updatePickupOrderStatus = async (
     const docRef = doc(db, 'restaurants', restaurantId, 'pickup_orders', orderId);
     await updateDoc(docRef, { status });
     console.log('✅ Updated pickup order status:', orderId, 'to', status);
+};
+
+/**
+ * Subscribe to active pickup orders (preparing or ready)
+ */
+export const subscribeToActivePickupOrders = (
+    restaurantId: string,
+    callback: (orders: PickupOrder[]) => void
+) => {
+    const ordersRef = collection(db, 'restaurants', restaurantId, 'pickup_orders');
+    const q = query(
+        ordersRef,
+        where('status', 'in', ['preparing', 'ready']),
+        orderBy('created_at', 'desc')
+    );
+
+    return onSnapshot(q, (snapshot) => {
+        const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as PickupOrder));
+        callback(orders);
+    });
 };
