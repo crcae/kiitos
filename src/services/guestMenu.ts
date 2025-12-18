@@ -62,8 +62,9 @@ export const getRestaurantConfig = async (restaurantId: string) => {
 export const sendOrderToKitchen = async (
     restaurantId: string,
     tableId: string,
-    items: { product: Product, quantity: number }[],
-    createdById?: string  // Format: "guest-1", "waiter-1", etc.
+    items: { product: Product, quantity: number, modifiers?: any[] }[],
+    createdById?: string,  // Format: "guest-1", "waiter-1", etc.
+    createdByName?: string // Name of the person creating the order
 ) => {
     if (items.length === 0) return;
 
@@ -112,12 +113,17 @@ export const sendOrderToKitchen = async (
             status: 'sent',
             created_by: createdBy,
             created_by_id: createdById || 'guest-1',
-            modifiers: [],
+            created_by_name: createdByName,
+            modifiers: item.modifiers || [],
             paid_quantity: 0  // Initialize to 0
         }));
 
-        // Calculate totals
-        const newItemsSubtotal = orderItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+        // Calculate totals including modifiers
+        const newItemsSubtotal = orderItems.reduce((sum, item) => {
+            const modifiersTotal = item.modifiers?.reduce((mSum, mod) => mSum + mod.price, 0) || 0;
+            return sum + ((item.price + modifiersTotal) * item.quantity);
+        }, 0);
         const newItemsTax = newItemsSubtotal * 0.00; // 0% tax for now
         const newItemsTotal = newItemsSubtotal + newItemsTax;
 
@@ -237,7 +243,10 @@ export const subscribeToActiveSession = (restaurantId: string, tableId: string, 
                     // Inject status from order if not on item
                     const itemWithStatus = { ...item, status: item.status || orderData.status || 'sent' };
                     allItems.push(itemWithStatus);
-                    total += item.price * item.quantity;
+
+                    // Calculate total including modifiers
+                    const modifiersTotal = item.modifiers?.reduce((sum, mod) => sum + mod.price, 0) || 0;
+                    total += (item.price + modifiersTotal) * item.quantity;
                 });
             });
 

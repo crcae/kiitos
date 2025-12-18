@@ -11,15 +11,27 @@ import { db } from '../services/firebaseConfig';
 type SplitMode = 'full' | 'items' | 'equal' | 'custom';
 
 interface PaymentInterfaceProps {
-    sessionId: string;
+    sessionId?: string; // Optional if localSession is provided
     restaurantId: string;
     onClose?: () => void;
     onPaymentSuccess?: () => void;
     mode?: 'guest' | 'waiter';
+    localSession?: Session; // Optional: use this instead of subscribing to a session
+    onConfirmPayment?: (amount: number, tip: number, selectedItems?: any[]) => Promise<void>; // Optional: custom handler for payment
+    hideSplitModes?: boolean; // Optional: hide splitting UI
 }
 
-export default function PaymentInterface({ sessionId, restaurantId, onClose, onPaymentSuccess, mode = 'guest' }: PaymentInterfaceProps) {
-    const [session, setSession] = useState<Session | null>(null);
+export default function PaymentInterface({
+    sessionId,
+    restaurantId,
+    onClose,
+    onPaymentSuccess,
+    mode = 'guest',
+    localSession,
+    onConfirmPayment,
+    hideSplitModes = false
+}: PaymentInterfaceProps) {
+    const [session, setSession] = useState<Session | null>(localSession || null);
     const [loading, setLoading] = useState(true);
     const [splitMode, setSplitMode] = useState<SplitMode>('full');
     const [selectedVirtualIds, setSelectedVirtualIds] = useState<Set<string>>(new Set());
@@ -40,7 +52,16 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
     const [useCustomTip, setUseCustomTip] = useState(false);
 
     useEffect(() => {
-        if (!sessionId || !restaurantId) return;
+        if (localSession) {
+            setSession(localSession);
+            setLoading(false);
+            return;
+        }
+
+        if (!sessionId || !restaurantId) {
+            setLoading(false);
+            return;
+        };
 
         const unsubscribe = subscribeToSession(sessionId, (data) => {
             console.log('🔄🔄🔄 [PaymentInterface] Session updated:', {
@@ -61,11 +82,14 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         }, restaurantId);
 
         return () => unsubscribe();
-    }, [sessionId, restaurantId]);
+    }, [sessionId, restaurantId, localSession]);
 
     // Load payment summary with real-time updates
     useEffect(() => {
-        if (!sessionId || !restaurantId) return;
+        if (localSession || !sessionId || !restaurantId) {
+            if (localSession) setPayments([]); // No payments history for local sessions yet
+            return;
+        }
 
         const paymentsRef = collection(db, 'restaurants', restaurantId, 'sessions', sessionId, 'payments');
         const unsubscribe = onSnapshot(paymentsRef, (snapshot) => {
@@ -76,7 +100,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         });
 
         return () => unsubscribe();
-    }, [sessionId, restaurantId]);
+    }, [sessionId, restaurantId, localSession]);
 
     const expandedItems = useMemo(() => {
         if (!session) return [];
@@ -95,6 +119,15 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
 
         return expanded;
     }, [session, session?.items, session?.items?.length, session?.amount_paid]);
+
+    // Calculate actual total including modifiers
+    const calculatedTotal = useMemo(() => {
+        if (!session) return 0;
+        return session.items.reduce((sum, item) => {
+            const modifiersTotal = item.modifiers?.reduce((mSum, mod) => mSum + mod.price, 0) || 0;
+            return sum + ((item.price + modifiersTotal) * item.quantity);
+        }, 0);
+    }, [session?.items]);
 
     const toggleItemSelection = (virtualId: string) => {
         const newSelection = new Set(selectedVirtualIds);
@@ -131,7 +164,10 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
 
     const calculateAmount = (): number => {
         if (!session) return 0;
-        const remaining = session.remaining_amount || (session.total - (session.amount_paid || 0));
+        const totalPaid = session.amount_paid || 0;
+        const remaining = calculatedTotal - totalPaid;
+
+        if (hideSplitModes) return remaining;
 
         switch (splitMode) {
             case 'full':
@@ -142,7 +178,10 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                         const isPaid = item.unitIndex < (item.paid_quantity || 0);
                         return selectedVirtualIds.has(item.virtualId) && !isPaid;
                     })
-                    .reduce((sum, item) => sum + item.price, 0);
+                    .reduce((sum, item) => {
+                        const modifiersTotal = item.modifiers?.reduce((mSum, mod) => mSum + mod.price, 0) || 0;
+                        return sum + (item.price + modifiersTotal);
+                    }, 0);
             case 'equal':
                 const count = parseInt(splitCount) || 1;
                 return remaining / count;
@@ -167,7 +206,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         const amount = calculateAmount();
         const tip = calculateTip();
         const totalWithTip = amount + tip;
-        const remaining = session.remaining_amount || (session.total - (session.amount_paid || 0));
+        const remaining = calculatedTotal - (session.amount_paid || 0);
 
         // CRITICAL: Validate ONLY the bill amount (without tip) against remaining
         if (amount > remaining + 0.01) {
@@ -237,45 +276,57 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
 
                 await recordItemPayment(
                     restaurantId,
-                    session.id,
+                    session.id || 'local',
                     selectedItems,
                     paymentMethod,
                     mode,
                     tip
                 );
             } else {
-                await recordPayment(
-                    restaurantId,
-                    session.id,
-                    amount,
-                    paymentMethod, // Use selected method
-                    mode, // 'guest' or 'waiter'
-                    tip
-                );
+                if (onConfirmPayment) {
+                    await onConfirmPayment(amount, tip);
+                } else if (session.id) {
+                    await recordPayment(
+                        restaurantId,
+                        session.id,
+                        amount,
+                        paymentMethod, // Use selected method
+                        mode, // 'guest' or 'waiter'
+                        tip
+                    );
+                }
+            }
+
+            if (onConfirmPayment) {
+                // If using custom handler, we assume success or handle failure via throw
+                if (onPaymentSuccess) onPaymentSuccess();
+                return;
             }
 
             // Reload session to get updated remaining amount
-            const updatedSession = await new Promise<Session | null>((resolve) => {
-                const unsubscribe = subscribeToSession(session.id, (data) => {
-                    resolve(data);
-                    unsubscribe();
-                }, restaurantId);
-            });
+            if (session.id) {
+                const updatedSession = await new Promise<Session | null>((resolve) => {
+                    const unsubscribe = subscribeToSession(session.id, (data) => {
+                        resolve(data);
+                        unsubscribe();
+                    }, restaurantId);
+                });
 
-            const newRemaining = updatedSession?.remaining_amount || 0;
-            const isFullyPaid = newRemaining <= 0.01;
+                const newRemaining = updatedSession?.remaining_amount || 0;
+                const isFullyPaid = newRemaining <= 0.01;
 
-            if (isFullyPaid) {
-                Alert.alert('¡Cuenta Cerrada!', `¡Pago completado! Gracias por tu visita.`);
-                if (onPaymentSuccess) onPaymentSuccess();
-                if (onClose) onClose();
-            } else {
-                Alert.alert(
-                    'Abono Registrado ✓',
-                    `Pagaste $${amount.toFixed(2)}.\n\nRestan $${newRemaining.toFixed(2)} por pagar.`,
-                    [{ text: 'OK' }]
-                );
-                if (onPaymentSuccess) onPaymentSuccess();
+                if (isFullyPaid) {
+                    Alert.alert('¡Cuenta Cerrada!', `¡Pago completado! Gracias por tu visita.`);
+                    if (onPaymentSuccess) onPaymentSuccess();
+                    if (onClose) onClose();
+                } else {
+                    Alert.alert(
+                        'Abono Registrado ✓',
+                        `Pagaste $${amount.toFixed(2)}.\n\nRestan $${newRemaining.toFixed(2)} por pagar.`,
+                        [{ text: 'OK' }]
+                    );
+                    if (onPaymentSuccess) onPaymentSuccess();
+                }
             }
         } catch (error) {
             console.error(error);
@@ -301,7 +352,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         );
     }
 
-    const remaining = session.remaining_amount || (session.total - (session.amount_paid || 0));
+    const remaining = calculatedTotal - (session.amount_paid || 0);
 
     if (remaining <= 0) {
         return (
@@ -316,7 +367,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                         <Text style={styles.receiptSectionTitle}>Resumen de Cuenta</Text>
                         <View style={styles.receiptRow}>
                             <Text style={styles.receiptLabel}>Subtotal:</Text>
-                            <Text style={styles.receiptValue}>${session.subtotal?.toFixed(2) || session.total.toFixed(2)}</Text>
+                            <Text style={styles.receiptValue}>${session.subtotal?.toFixed(2) || calculatedTotal.toFixed(2)}</Text>
                         </View>
                         {session.tax > 0 && (
                             <View style={styles.receiptRow}>
@@ -326,7 +377,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                         )}
                         <View style={[styles.receiptRow, styles.receiptTotalRow]}>
                             <Text style={styles.receiptTotalLabel}>Total:</Text>
-                            <Text style={styles.receiptTotalValue}>${session.total.toFixed(2)}</Text>
+                            <Text style={styles.receiptTotalValue}>${calculatedTotal.toFixed(2)}</Text>
                         </View>
                     </View>
 
@@ -397,7 +448,11 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
         <ScrollView style={styles.container}>
             <View style={styles.header}>
                 <Text style={styles.title}>Tu Cuenta</Text>
-                <Text style={styles.subtitle}>Mesa {session.tableId?.substring(0, 8)}</Text>
+                {session.tableName ? (
+                    <Text style={styles.subtitle}>Mesa {session.tableName}</Text>
+                ) : session.tableId ? (
+                    <Text style={styles.subtitle}>Mesa {session.tableId?.substring(0, 8)}</Text>
+                ) : null}
             </View>
 
             {/* ORDER SUMMARY */}
@@ -414,28 +469,39 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
 
                 {session.items.map((item, idx) => {
                     const isWaiter = item.created_by === 'waiter' || item.created_by_id?.startsWith('waiter');
-                    const creatorLabel = isWaiter ? 'Mesero' : 'Cliente';
+                    const creatorLabel = isWaiter ? 'Mesero' : (item.created_by_name || 'Cliente');
 
                     return (
                         <View key={`${item.id}_${idx}`} style={styles.orderSummaryRow}>
                             <View style={styles.orderSummaryInfo}>
-                                <Text style={styles.orderSummaryName}>
-                                    {item.quantity}x {item.name}
-                                </Text>
-                                <View style={[
-                                    styles.creatorBadge,
-                                    isWaiter ? styles.creatorBadgeWaiter : styles.creatorBadgeGuest
-                                ]}>
-                                    <Text style={[
-                                        styles.creatorText,
-                                        isWaiter ? styles.creatorTextWaiter : styles.creatorTextGuest
-                                    ]}>
-                                        {creatorLabel}
+                                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                                    <Text style={styles.orderSummaryName}>
+                                        {item.quantity}x {item.name}
                                     </Text>
+                                    <View style={[
+                                        styles.creatorBadge,
+                                        isWaiter ? styles.creatorBadgeWaiter : styles.creatorBadgeGuest
+                                    ]}>
+                                        <Text style={[
+                                            styles.creatorText,
+                                            isWaiter ? styles.creatorTextWaiter : styles.creatorTextGuest
+                                        ]}>
+                                            {creatorLabel}
+                                        </Text>
+                                    </View>
                                 </View>
+                                {item.modifiers && item.modifiers.length > 0 && (
+                                    <View style={{ marginTop: 4 }}>
+                                        {item.modifiers.map((mod, mIdx) => (
+                                            <Text key={mIdx} style={{ fontSize: 12, color: '#666' }}>
+                                                + {mod.name} {mod.price > 0 ? `($${mod.price.toFixed(2)})` : ''}
+                                            </Text>
+                                        ))}
+                                    </View>
+                                )}
                             </View>
                             <Text style={styles.orderSummaryPrice}>
-                                ${(item.price * item.quantity).toFixed(2)}
+                                ${((item.price + (item.modifiers?.reduce((sum, mod) => sum + mod.price, 0) || 0)) * item.quantity).toFixed(2)}
                             </Text>
                         </View>
                     );
@@ -447,7 +513,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                 <Text style={styles.sectionTitle}>Resumen de Pagos</Text>
                 <View style={styles.summaryRow}>
                     <Text style={styles.summaryLabel}>Total Original:</Text>
-                    <Text style={styles.summaryValue}>${session.total.toFixed(2)}</Text>
+                    <Text style={styles.summaryValue}>${calculatedTotal.toFixed(2)}</Text>
                 </View>
 
                 {payments.length > 0 && (
@@ -473,40 +539,42 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
             </AirbnbCard>
 
             {/* SPLIT MODE SELECTOR */}
-            <View style={styles.modeSelector}>
-                <TouchableOpacity
-                    style={[styles.modeButton, splitMode === 'full' && styles.modeButtonActive]}
-                    onPress={() => setSplitMode('full')}
-                >
-                    <Text style={[styles.modeButtonText, splitMode === 'full' && styles.modeButtonTextActive]}>
-                        Pagar Todo
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.modeButton, splitMode === 'items' && styles.modeButtonActive]}
-                    onPress={() => setSplitMode('items')}
-                >
-                    <Text style={[styles.modeButtonText, splitMode === 'items' && styles.modeButtonTextActive]}>
-                        Por Items
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.modeButton, splitMode === 'equal' && styles.modeButtonActive]}
-                    onPress={() => setSplitMode('equal')}
-                >
-                    <Text style={[styles.modeButtonText, splitMode === 'equal' && styles.modeButtonTextActive]}>
-                        Dividir Igual
-                    </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                    style={[styles.modeButton, splitMode === 'custom' && styles.modeButtonActive]}
-                    onPress={() => setSplitMode('custom')}
-                >
-                    <Text style={[styles.modeButtonText, splitMode === 'custom' && styles.modeButtonTextActive]}>
-                        Monto Custom
-                    </Text>
-                </TouchableOpacity>
-            </View>
+            {!hideSplitModes && (
+                <View style={styles.modeSelector}>
+                    <TouchableOpacity
+                        style={[styles.modeButton, splitMode === 'full' && styles.modeButtonActive]}
+                        onPress={() => setSplitMode('full')}
+                    >
+                        <Text style={[styles.modeButtonText, splitMode === 'full' && styles.modeButtonTextActive]}>
+                            Pagar Todo
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.modeButton, splitMode === 'items' && styles.modeButtonActive]}
+                        onPress={() => setSplitMode('items')}
+                    >
+                        <Text style={[styles.modeButtonText, splitMode === 'items' && styles.modeButtonTextActive]}>
+                            Por Items
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.modeButton, splitMode === 'equal' && styles.modeButtonActive]}
+                        onPress={() => setSplitMode('equal')}
+                    >
+                        <Text style={[styles.modeButtonText, splitMode === 'equal' && styles.modeButtonTextActive]}>
+                            Dividir Igual
+                        </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.modeButton, splitMode === 'custom' && styles.modeButtonActive]}
+                        onPress={() => setSplitMode('custom')}
+                    >
+                        <Text style={[styles.modeButtonText, splitMode === 'custom' && styles.modeButtonTextActive]}>
+                            Monto Custom
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {/* EQUAL SPLIT INPUT */}
             {splitMode === 'equal' && (
@@ -580,8 +648,17 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                                             styles.itemName,
                                             isPaid && styles.itemNamePaid
                                         ]}>
-                                            1x {expandedItem.name}
+                                            1x {expandedItem.name} ({expandedItem.created_by === 'waiter' || expandedItem.created_by_id?.startsWith('waiter') ? 'Mesero' : (expandedItem.created_by_name || 'Cliente')})
                                         </Text>
+                                        {expandedItem.modifiers && expandedItem.modifiers.length > 0 && (
+                                            <View style={{ marginTop: 2 }}>
+                                                {expandedItem.modifiers.map((mod, mIdx) => (
+                                                    <Text key={mIdx} style={{ fontSize: 11, color: '#888' }}>
+                                                        + {mod.name} {mod.price > 0 ? `($${mod.price.toFixed(2)})` : ''}
+                                                    </Text>
+                                                ))}
+                                            </View>
+                                        )}
                                         {isPaid && (
                                             <Text style={styles.paidBadge}>Pagado</Text>
                                         )}
@@ -592,7 +669,7 @@ export default function PaymentInterface({ sessionId, restaurantId, onClose, onP
                                     styles.itemPrice,
                                     isPaid && styles.itemPricePaid
                                 ]}>
-                                    ${expandedItem.price.toFixed(2)}
+                                    ${(expandedItem.price + (expandedItem.modifiers?.reduce((sum, mod) => sum + mod.price, 0) || 0)).toFixed(2)}
                                 </Text>
                             </TouchableOpacity>
                         );
@@ -1235,9 +1312,7 @@ const styles = StyleSheet.create({
     },
     orderSummaryInfo: {
         flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        flexWrap: 'wrap',
+        flexDirection: 'column',
     },
     orderSummaryName: {
         fontSize: 15,
