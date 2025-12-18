@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { LogOut, UtensilsCrossed, LayoutGrid, Users } from 'lucide-react-native';
+import { LogOut, UtensilsCrossed, LayoutGrid, Users, BarChart3 } from 'lucide-react-native';
 import { useAuth } from '../../src/context/AuthContext';
 import { useRestaurant } from '../../src/hooks/useRestaurant';
 
@@ -50,6 +50,13 @@ export default function AdminDashboard() {
             icon: Users,
             color: 'bg-blue-500',
             route: '/admin/staff',
+        },
+        {
+            title: 'Analytics',
+            description: 'View reports and export data',
+            icon: BarChart3,
+            color: 'bg-purple-500',
+            route: '/admin/dashboard',
         }
     ];
 
