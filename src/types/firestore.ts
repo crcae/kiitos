@@ -70,6 +70,11 @@ export interface RestaurantSettings {
         accent_color?: string;
         font_style?: 'modern' | 'serif' | 'mono';
     };
+    opening_hours?: {
+        [key: string]: { open: string; close: string; closed?: boolean };
+    };
+    address?: RestaurantAddress;
+    google_place_id?: string;
 }
 
 export interface Subscription {

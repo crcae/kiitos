@@ -61,6 +61,7 @@ export default function AdminSidebar({
         { title: 'Pagos', icon: CreditCard, route: '/admin/payments' },
         { title: 'Ventas', icon: BarChart3, route: '/admin/sales' },
         { title: 'Estadísticas Staff', icon: Users, route: '/admin/staff-stats' },
+        { title: 'Configuración', icon: Settings, route: '/admin/settings' },
     ];
 
     const handleOnItemPress = (route: string) => {

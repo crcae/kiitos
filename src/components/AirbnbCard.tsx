@@ -3,10 +3,12 @@ import { View, StyleSheet, ViewProps, TouchableOpacity, Animated } from 'react-n
 import { colors, spacing, borderRadius, shadows } from '../styles/theme';
 
 type ShadowSize = 'sm' | 'md' | 'lg' | 'xl';
+type CardVariant = 'light' | 'dark';
 
 interface AirbnbCardProps extends ViewProps {
     children: React.ReactNode;
     shadow?: ShadowSize;
+    variant?: CardVariant;
     pressable?: boolean;
     onPress?: () => void;
 }
@@ -14,6 +16,7 @@ interface AirbnbCardProps extends ViewProps {
 export default function AirbnbCard({
     children,
     shadow = 'md',
+    variant = 'light',
     pressable = false,
     onPress,
     style,
@@ -39,6 +42,7 @@ export default function AirbnbCard({
 
     const cardStyle = [
         styles.card,
+        styles[variant],
         shadows[shadow],
         style,
     ];
@@ -50,7 +54,7 @@ export default function AirbnbCard({
                 onPressIn={handlePressIn}
                 onPressOut={handlePressOut}
                 onPress={onPress}
-                {...props}
+                {...(props as any)}
             >
                 <Animated.View style={[cardStyle, { transform: [{ scale: scaleAnim }] }]}>
                     {children}
@@ -68,8 +72,13 @@ export default function AirbnbCard({
 
 const styles = StyleSheet.create({
     card: {
-        backgroundColor: colors.white,
         borderRadius: borderRadius.md,
         padding: spacing.lg,
+    },
+    light: {
+        backgroundColor: colors.white,
+    },
+    dark: {
+        backgroundColor: colors.surfaceDark,
     },
 });
