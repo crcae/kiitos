@@ -1,12 +1,14 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ScrollView, ActivityIndicator, StatusBar, Platform, Modal, TextInput } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ShoppingBag, ChevronLeft, Plus, Minus, FileText, Utensils, CheckCircle } from 'lucide-react-native';
+import { ShoppingBag, ChevronLeft, Plus, Minus, FileText, Utensils, CheckCircle, Clock } from 'lucide-react-native';
 import { colors } from '../styles/theme';
 import { subscribeToGuestCategories, subscribeToGuestProducts, getTableDetails, sendOrderToKitchen, subscribeToActiveSession } from '../services/guestMenu';
 import { subscribeToRestaurantConfig } from '../services/menu';
-import { Category, Product, Table, OrderItem, RestaurantSettings, SelectedModifier, ModifierGroup, ModifierOption } from '../types/firestore';
+import { subscribeToSession, joinSession } from '../services/sessions';
+import { Category, Product, Table, OrderItem, RestaurantSettings, SelectedModifier, ModifierGroup, ModifierOption, Session, SessionStaff } from '../types/firestore';
+import { useAuth } from '../context/AuthContext';
 
 interface CartItem {
     cartId: string;
@@ -37,6 +39,7 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
     const [allowOrdering, setAllowOrdering] = useState(false);
     const [loading, setLoading] = useState(true);
     const [branding, setBranding] = useState<RestaurantSettings['branding']>(undefined);
+    const [openingHours, setOpeningHours] = useState<any>(null);
 
     // UI State
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -57,6 +60,10 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
     const [sessionItems, setSessionItems] = useState<OrderItem[]>([]);
     const [sessionTotal, setSessionTotal] = useState(0);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
+    const [activeSession, setActiveSession] = useState<Session | null>(null);
+    const { user } = useAuth();
+
+    const unsubsRef = useRef<(() => void)[]>([]);
 
     useEffect(() => {
         if (!restaurantId) return;
@@ -77,34 +84,28 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                         setSelectedCategory(data[0].id);
                     }
                 });
+                unsubsRef.current.push(unsubCats);
+
                 const unsubProds = subscribeToGuestProducts(restaurantId, setProducts);
+                unsubsRef.current.push(unsubProds);
 
                 const unsubConfig = subscribeToRestaurantConfig(restaurantId, (config) => {
                     setAllowOrdering(config.allow_guest_ordering ?? false);
                     setBranding(config.branding);
+                    setOpeningHours(config.opening_hours);
                 });
+                unsubsRef.current.push(unsubConfig);
 
                 if (tableId) {
-                    const unsubSession = subscribeToActiveSession(restaurantId, tableId, (items, total, sessionId) => {
+                    const unsubSession = subscribeToActiveSession(restaurantId, tableId, (items, total, sessionId, session) => {
                         setSessionItems(items);
                         setSessionTotal(total);
                         setCurrentSessionId(sessionId);
+                        if (session) setActiveSession(session);
                     });
-                    setLoading(false);
-                    return () => {
-                        unsubCats();
-                        unsubProds();
-                        unsubConfig();
-                        if (unsubSession) unsubSession();
-                    };
-                } else {
-                    setLoading(false);
-                    return () => {
-                        unsubCats();
-                        unsubProds();
-                        unsubConfig();
-                    };
+                    unsubsRef.current.push(unsubSession);
                 }
+                setLoading(false);
             } catch (e) {
                 console.error(e);
                 setLoading(false);
@@ -112,7 +113,49 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
         };
 
         loadData();
+
+        return () => {
+            unsubsRef.current.forEach(unsub => unsub());
+            unsubsRef.current = [];
+        };
     }, [restaurantId, tableId]);
+
+    // Auto-join session for waiters
+    useEffect(() => {
+        if (mode === 'waiter' && user && activeSession && currentSessionId) {
+            const isJoined = activeSession.staff?.some(s => s.id === user.id);
+            if (!isJoined) {
+                console.log('🤖 [DigitalMenu] Auto-joining waiter to session');
+                joinSession(restaurantId, currentSessionId, user.id, user.name).catch(console.error);
+            }
+        }
+    }, [activeSession, user, mode, currentSessionId, restaurantId]);
+
+    const isRestaurantOpen = useMemo(() => {
+        if (!openingHours) return true; // Default to open if not configured yet
+
+        const now = new Date();
+        const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+        const currentDay = days[now.getDay()];
+        const dayConfig = openingHours[currentDay];
+
+        if (!dayConfig || dayConfig.closed) return false;
+
+        const currentTime = now.getHours() * 60 + now.getMinutes();
+
+        const [openH, openM] = dayConfig.open.split(':').map(Number);
+        const [closeH, closeM] = dayConfig.close.split(':').map(Number);
+
+        const openTime = openH * 60 + openM;
+        const closeTime = closeH * 60 + closeM;
+
+        // Handle cases where closing time is after midnight (e.g., 09:00 to 02:00)
+        if (closeTime < openTime) {
+            return currentTime >= openTime || currentTime <= closeTime;
+        }
+
+        return currentTime >= openTime && currentTime <= closeTime;
+    }, [openingHours]);
 
     // Cart Logic
     const addToCart = (product: Product) => {
@@ -224,6 +267,10 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
     };
 
     const handleSendOrder = () => {
+        if (!isRestaurantOpen && mode !== 'waiter') {
+            alert("El restaurante está cerrado en este momento. No se pueden enviar pedidos.");
+            return;
+        }
         if (mode === 'takeout') {
             if (onCheckout) onCheckout(cart);
             return;
@@ -297,6 +344,18 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
         }
     };
 
+    const handleJoinSession = async () => {
+        if (!restaurantId || !currentSessionId || !user) return;
+
+        try {
+            await joinSession(restaurantId, currentSessionId, user.id, user.name);
+            alert("Te has unido a la mesa.");
+        } catch (e) {
+            console.error(e);
+            alert("Error al unirse a la mesa.");
+        }
+    };
+
     // Filtered Products
     const visibleProducts = useMemo(() => {
         if (!selectedCategory) return [];
@@ -319,8 +378,10 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
             <View className="px-5 py-4 flex-row justify-between items-center bg-white border-b border-gray-100">
                 <View>
                     {mode === 'waiter' && (
-                        <View className="bg-orange-100 px-2 py-0.5 rounded self-start mb-1 border border-orange-200">
-                            <Text className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">PORTAL MESERO</Text>
+                        <View className="flex-row items-center gap-2 mb-1">
+                            <View className="bg-orange-100 px-2 py-0.5 rounded self-start border border-orange-200">
+                                <Text className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">PORTAL MESERO</Text>
+                            </View>
                         </View>
                     )}
 
@@ -361,6 +422,16 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                     </View>
                 )}
             </View>
+
+            {/* Closed Banner */}
+            {!isRestaurantOpen && mode !== 'waiter' && (
+                <View className="bg-red-50 px-5 py-3 border-b border-red-100 flex-row items-center">
+                    <Clock size={16} color="#ef4444" className="mr-2" />
+                    <Text className="text-red-600 font-medium text-sm flex-1">
+                        El restaurante está cerrado. Puedes ver el menú, pero no es posible realizar pedidos.
+                    </Text>
+                </View>
+            )}
 
             {/* TAB CONTENT: MENU */}
             {activeTab === 'menu' && (
@@ -415,7 +486,7 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                                         <Text className="text-base font-semibold text-gray-900" style={branding?.primary_color ? { color: branding.primary_color } : {}}>${item.price.toFixed(2)}</Text>
 
                                         {/* Ordering Controls - Check allow_guest_ordering unless mode is waiter or takeout (takeout always orders) */}
-                                        {(allowOrdering || mode === 'waiter' || mode === 'takeout') && (
+                                        {isRestaurantOpen && (allowOrdering || mode === 'waiter' || mode === 'takeout') && (
                                             getQuantity(item.id) === 0 ? (
                                                 <TouchableOpacity
                                                     onPress={() => addToCart(item)}
@@ -549,6 +620,20 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                     ListFooterComponent={
                         sessionItems.length > 0 ? (
                             <View className="mt-8 pt-4 border-t border-gray-200">
+                                {/* Staff Section */}
+                                {activeSession?.staff && activeSession.staff.length > 0 && (
+                                    <View className="mb-6">
+                                        <Text className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-2">Personal Atendiendo</Text>
+                                        <View className="flex-row flex-wrap gap-2">
+                                            {activeSession.staff.map((s) => (
+                                                <View key={s.id} className="bg-gray-100 px-3 py-1.5 rounded-full border border-gray-200">
+                                                    <Text className="text-gray-700 font-medium text-xs">{s.name}</Text>
+                                                </View>
+                                            ))}
+                                        </View>
+                                    </View>
+                                )}
+
                                 <View className="flex-row justify-between items-center mb-6">
                                     <Text className="text-xl font-bold text-gray-900">Total</Text>
                                     <Text className="text-2xl font-extrabold text-gray-900">${sessionTotal.toFixed(2)}</Text>

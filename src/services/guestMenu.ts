@@ -210,7 +210,7 @@ export const sendOrderToKitchen = async (
     });
 };
 
-export const subscribeToActiveSession = (restaurantId: string, tableId: string, callback: (items: OrderItem[], total: number, sessionId: string | null) => void) => {
+export const subscribeToActiveSession = (restaurantId: string, tableId: string, callback: (items: OrderItem[], total: number, sessionId: string | null, session?: Session) => void) => {
     // Strategy: Listen to the Table to get active_session_id. 
     // Then Listen to 'orders' collection where sessionId matches.
 
@@ -225,32 +225,42 @@ export const subscribeToActiveSession = (restaurantId: string, tableId: string, 
             return;
         }
 
-        // 2. Listen to Orders for this Session
-        const q = query(
-            collection(db, 'restaurants', restaurantId, 'orders'),
-            where('sessionId', '==', sessionId),
-            orderBy('createdAt', 'desc')
-        );
+        // 2. Listen to the Session document itself (for staff, status, etc.)
+        const sessionRef = doc(db, 'restaurants', restaurantId, 'sessions', sessionId);
+        const unsubSession = onSnapshot(sessionRef, (sessionSnap) => {
+            const sessionData = sessionSnap.exists() ? { id: sessionSnap.id, ...sessionSnap.data() } as Session : undefined;
 
-        return onSnapshot(q, (snapshot) => {
-            let allItems: OrderItem[] = [];
-            let total = 0;
+            // 3. Listen to Orders for this Session
+            const q = query(
+                collection(db, 'restaurants', restaurantId, 'orders'),
+                where('sessionId', '==', sessionId),
+                orderBy('createdAt', 'desc')
+            );
 
-            snapshot.docs.forEach(doc => {
-                const orderData = doc.data();
-                const items = orderData.items as OrderItem[];
-                items.forEach(item => {
-                    // Inject status from order if not on item
-                    const itemWithStatus = { ...item, status: item.status || orderData.status || 'sent' };
-                    allItems.push(itemWithStatus);
+            const unsubOrders = onSnapshot(q, (snapshot) => {
+                let allItems: OrderItem[] = [];
+                let total = 0;
 
-                    // Calculate total including modifiers
-                    const modifiersTotal = item.modifiers?.reduce((sum, mod) => sum + mod.price, 0) || 0;
-                    total += (item.price + modifiersTotal) * item.quantity;
+                snapshot.docs.forEach(doc => {
+                    const orderData = doc.data();
+                    const items = orderData.items as OrderItem[];
+                    items.forEach(item => {
+                        // Inject status from order if not on item
+                        const itemWithStatus = { ...item, status: item.status || orderData.status || 'sent' };
+                        allItems.push(itemWithStatus);
+
+                        // Calculate total including modifiers
+                        const modifiersTotal = item.modifiers?.reduce((sum, mod) => sum + mod.price, 0) || 0;
+                        total += (item.price + modifiersTotal) * item.quantity;
+                    });
                 });
+
+                callback(allItems, total, sessionId, sessionData);
             });
 
-            callback(allItems, total, sessionId);
+            return unsubOrders;
         });
+
+        return unsubSession;
     });
 };

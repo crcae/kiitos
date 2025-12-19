@@ -10,10 +10,11 @@ import {
     where,
     onSnapshot,
     orderBy,
-    limit
+    limit,
+    arrayUnion
 } from 'firebase/firestore';
 import { db } from './firebaseConfig';
-import { Session, OrderItem, Order, SessionStatus, PaymentStatus } from '../types/firestore';
+import { Session, OrderItem, Order, SessionStatus, PaymentStatus, SessionStaff } from '../types/firestore';
 import { updateTableStatus } from './tables';
 
 const SESSIONS_COLLECTION = 'sessions';
@@ -208,4 +209,22 @@ export const subscribeToDailyPaidSessions = (restaurantId: string, callback: (se
         const sessions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
         callback(sessions);
     });
+};
+
+export const joinSession = async (restaurantId: string, sessionId: string, staffId: string, staffName: string) => {
+    console.log('👤 [joinSession] Staff joining session:', { restaurantId, sessionId, staffId, staffName });
+    const sessionRef = getSessionRef(restaurantId, sessionId);
+
+    const staffEntry: SessionStaff = {
+        id: staffId,
+        name: staffName,
+        joinedAt: Timestamp.now()
+    };
+
+    await updateDoc(sessionRef, {
+        staff: arrayUnion(staffEntry),
+        staff_ids: arrayUnion(staffId)
+    });
+
+    console.log('✅ [joinSession] Staff attached to session');
 };
