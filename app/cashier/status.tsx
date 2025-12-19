@@ -120,10 +120,11 @@ export default function CashierStatusScreen() {
     const handleSwitchToPayment = () => {
         console.log('💳 [handleSwitchToPayment] Switching from Menu to Payment');
         setShowMenuModal(false);
-        // Small delay to allow modal animation to clear before opening next one
+        // [BUG FIX] Increase delay to 500ms to allow Menu Modal to fully unmount/animate out
+        // before Payment Modal attempts to mount. Prevents "stacked modals" issue.
         setTimeout(() => {
             setShowPaymentModal(true);
-        }, 300);
+        }, 500);
     };
 
     const handleLogout = async () => {
@@ -437,7 +438,7 @@ export default function CashierStatusScreen() {
                                     <Text style={styles.detailSubtitle}>
                                         {isPickupSelected
                                             ? `Code: ${selectedPickupOrder?.pickup_code}`
-                                            : `Order #${selectedSession?.qrCode.slice(-6)}`
+                                            : `Order #${(selectedSession?.qrCode || selectedSession?.id || "000000").slice(-6)}`
                                         }
                                     </Text>
                                 </View>

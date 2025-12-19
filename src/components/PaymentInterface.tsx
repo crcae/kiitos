@@ -412,7 +412,7 @@ export default function PaymentInterface({
                         <View style={[styles.receiptRow, styles.receiptTotalRow, { marginTop: 15 }]}>
                             <Text style={styles.receiptTotalLabel}>Total Pagado:</Text>
                             <Text style={styles.receiptTotalValue}>
-                                ${session.amount_paid.toFixed(2)}
+                                ${(session.amount_paid || 0).toFixed(2)}
                             </Text>
                         </View>
                     </View>
