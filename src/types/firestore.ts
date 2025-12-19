@@ -175,6 +175,12 @@ export interface OrderItem {
 export type SessionStatus = 'active' | 'closed' | 'partial_payment';
 export type PaymentStatus = 'unpaid' | 'paid' | 'partial' | 'refunded';
 
+export interface SessionStaff {
+    id: string;
+    name: string;
+    joinedAt: Timestamp;
+}
+
 export interface Session {
     id: string;
     restaurantId: string; // Tenant isolation
@@ -194,6 +200,8 @@ export interface Session {
     paymentStatus: PaymentStatus;
     qrCode: string;
     guestCount?: number;
+    staff?: SessionStaff[];
+    staff_ids?: string[];
 }
 
 export interface Order {

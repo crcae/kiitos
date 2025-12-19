@@ -5,6 +5,7 @@ export default function WaiterLayout() {
         <Stack>
             <Stack.Screen name="tables" options={{ title: 'Tables' }} />
             <Stack.Screen name="pos" options={{ title: 'New Order' }} />
+            <Stack.Screen name="dashboard" options={{ title: 'Dashboard', headerShown: false }} />
         </Stack>
     );
 }
