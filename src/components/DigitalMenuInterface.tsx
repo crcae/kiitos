@@ -21,9 +21,12 @@ interface DigitalMenuInterfaceProps {
     mode?: 'guest' | 'waiter' | 'takeout';
     sessionId?: string; // Optional pre-supplied session ID
     onCheckout?: (cart: CartItem[]) => void;
+    directSessionData?: OrderItem[]; // [CASHIER MODE] Inject live order items directly
+    onSuccess?: () => void; // Callback when order is sent successfully
+    onRequestPayment?: () => void; // Callback to switch to payment
 }
 
-export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'guest', sessionId: initialSessionId, onCheckout }: DigitalMenuInterfaceProps) {
+export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'guest', sessionId: initialSessionId, onCheckout, directSessionData, onSuccess, onRequestPayment }: DigitalMenuInterfaceProps) {
     const insets = useSafeAreaInsets();
     const router = useRouter();
 
@@ -272,6 +275,14 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
     };
 
     const handlePayBill = () => {
+        // [CASHIER FIX] If a custom payment handler is provided (e.g. from Dashboard Modal), use it!
+        // This prevents navigating away to /pay/* and instead lets the dashboard switch modals.
+        if (onRequestPayment) {
+            console.log('💳 [DigitalMenu] Delegate payment to parent (onRequestPayment)');
+            onRequestPayment();
+            return;
+        }
+
         if (currentSessionId) {
             router.push({
                 pathname: "/pay/[id]",
