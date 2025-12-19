@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, TextInput, ScrollView, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import { subscribeToSession } from '../services/sessions';
 import { recordPayment, recordItemPayment } from '../services/payments';
 import { Session, OrderItem, Payment } from '../types/firestore';
@@ -7,6 +8,7 @@ import AirbnbCard from './AirbnbCard';
 import { colors, spacing, typography } from '../styles/theme';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
+import ReviewSystem from './ReviewSystem';
 
 type SplitMode = 'full' | 'items' | 'equal' | 'custom';
 
@@ -31,6 +33,7 @@ export default function PaymentInterface({
     onConfirmPayment,
     hideSplitModes = false
 }: PaymentInterfaceProps) {
+    const router = useRouter();
     const [session, setSession] = useState<Session | null>(localSession || null);
     const [loading, setLoading] = useState(true);
     const [splitMode, setSplitMode] = useState<SplitMode>('full');
@@ -318,7 +321,10 @@ export default function PaymentInterface({
                 if (isFullyPaid) {
                     Alert.alert('¡Cuenta Cerrada!', `¡Pago completado! Gracias por tu visita.`);
                     if (onPaymentSuccess) onPaymentSuccess();
-                    if (onClose) onClose();
+
+                    if (mode === 'waiter' && onClose) {
+                        onClose();
+                    }
                 } else {
                     Alert.alert(
                         'Abono Registrado ✓',
@@ -432,6 +438,15 @@ export default function PaymentInterface({
                     >
                         <Text style={styles.receiptButtonTextSecondary}>📄 Descargar Recibo</Text>
                     </TouchableOpacity>
+
+                    {mode === 'guest' && (
+                        <ReviewSystem
+                            restaurantId={restaurantId}
+                            orderId={session.id}
+                            customerName={session.items?.[0]?.created_by_name || ''}
+                            onFinish={onClose}
+                        />
+                    )}
 
                     <Text style={styles.receiptFooter}>
                         Gracias por tu visita 🙏
@@ -796,9 +811,11 @@ export default function PaymentInterface({
                         <ActivityIndicator color="white" />
                     ) : (
                         <Text style={styles.payButtonText}>
-                            {paymentMethod === 'cash' ? 'Cobrar Efectivo' :
-                                paymentMethod === 'other' ? 'Registrar Pago Terminal' :
-                                    `Pagar $${(amountToPay + tipAmount).toFixed(2)}`}
+                            {mode === 'waiter' ? (
+                                paymentMethod === 'cash' ? 'Cobrar Efectivo' : 'Registrar Pago Terminal'
+                            ) : (
+                                `Pagar $${(amountToPay + tipAmount).toFixed(2)}`
+                            )}
                         </Text>
                     )}
                 </TouchableOpacity>
