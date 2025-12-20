@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Modal, Image, Platform, TextInput } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Modal, Image, Platform, TextInput, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Save, Clock, MapPin, Palette, Globe, QrCode, ExternalLink } from 'lucide-react-native';
+import { ArrowLeft, Save, Clock, MapPin, Palette, Globe, QrCode, Info, X, ExternalLink } from 'lucide-react-native';
+
 import { Linking } from 'react-native';
+
 import { useRouter } from 'expo-router';
 import AirbnbButton from '../../../src/components/AirbnbButton';
 import AirbnbInput from '../../../src/components/AirbnbInput';
@@ -39,14 +41,14 @@ export default function SettingsScreen() {
     const [brandingLogo, setBrandingLogo] = useState<string | null>(null);
     const [brandingColor, setBrandingColor] = useState('#F97316');
     const [openingHours, setOpeningHours] = useState<any>({});
-    const [address, setAddress] = useState({
-        street: '',
-        city: '',
-        state: '',
-        zip: '',
-        country: ''
-    });
     const [googlePlaceId, setGooglePlaceId] = useState('');
+    const [coordinates, setCoordinates] = useState<{ lat: number; lng: number } | null>(null);
+    const [locationName, setLocationName] = useState<string | null>(null);
+    const [showPlaceIdInfo, setShowPlaceIdInfo] = useState(false);
+    const [locationRestriction, setLocationRestriction] = useState({
+        enabled: false,
+        radius_meters: 1000 // Default 1km
+    });
 
     // UI State
     const [uploading, setUploading] = useState(false);
@@ -73,11 +75,17 @@ export default function SettingsScreen() {
                 });
                 setOpeningHours(initialHours);
             }
-            if (config.address) {
-                setAddress(config.address);
-            }
             if (config.google_place_id) {
                 setGooglePlaceId(config.google_place_id);
+            }
+            if (config.coordinates) {
+                setCoordinates(config.coordinates);
+            }
+            if (config.location_name) {
+                setLocationName(config.location_name);
+            }
+            if (config.location_restriction) {
+                setLocationRestriction(config.location_restriction);
             }
         });
 
@@ -91,8 +99,10 @@ export default function SettingsScreen() {
                 allow_guest_ordering: allowGuestOrdering,
                 enable_takeout: enableTakeout,
                 opening_hours: openingHours,
-                address: address,
-                google_place_id: googlePlaceId
+                google_place_id: googlePlaceId,
+                coordinates: coordinates || undefined,
+                location_name: locationName || undefined,
+                location_restriction: locationRestriction
             });
             Alert.alert('Éxito', 'Configuración guardada correctamente');
         } catch (e) {
@@ -136,6 +146,35 @@ export default function SettingsScreen() {
         } catch (e: any) {
             console.error(e);
             Alert.alert('Error', 'No se pudo guardar la marca: ' + e.message);
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const fetchCoordinates = async () => {
+        if (!googlePlaceId) {
+            Alert.alert('Error', 'Por favor ingresa un Google Place ID');
+            return;
+        }
+        setUploading(true);
+        try {
+            // Use local API proxy to avoid CORS
+            const response = await fetch(`/api/places/details?place_id=${googlePlaceId}`);
+            const data = await response.json();
+
+            if (data.status === 'OK' && data.result?.geometry?.location) {
+                const { lat, lng } = data.result.geometry.location;
+                setCoordinates({ lat, lng });
+                const name = data.result.name;
+                setLocationName(name);
+                Alert.alert('Éxito', `Ubicación confirmada:\n${name}`);
+            } else {
+                console.error('Places API Error:', data);
+                Alert.alert('Error', 'No se pudieron obtener las coordenadas. Verifica el Place ID.');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Error de red al conectar con Google Maps');
+            console.error(error);
         } finally {
             setUploading(false);
         }
@@ -283,78 +322,92 @@ export default function SettingsScreen() {
                 <View className="mb-8">
                     <View className="flex-row items-center mb-4">
                         <MapPin size={20} color="#6366f1" className="mr-2" />
-                        <Text className="text-lg font-bold text-white">Ubicación</Text>
+                        <Text className="text-lg font-bold text-white">Ubicación y Radio</Text>
                     </View>
                     <AirbnbCard variant="dark">
-                        <AirbnbInput
-                            label="Calle y Número"
-                            variant="dark"
-                            value={address.street}
-                            onChangeText={(t) => setAddress({ ...address, street: t })}
-                            placeholder="Av. Principal 123"
-                        />
-                        <View className="flex-row gap-4 mt-2">
-                            <View className="flex-1">
-                                <AirbnbInput
-                                    label="Ciudad"
-                                    variant="dark"
-                                    value={address.city}
-                                    onChangeText={(t) => setAddress({ ...address, city: t })}
-                                    placeholder="Ciudad"
-                                />
+                        <View className="mb-6">
+                            <View className="flex-row items-center mb-1">
+                                <Text className="text-white font-medium mr-2">Google Place ID</Text>
+                                <TouchableOpacity onPress={() => setShowPlaceIdInfo(true)}>
+                                    <Info size={16} color="#94a3b8" />
+                                </TouchableOpacity>
                             </View>
-                            <View className="flex-1">
-                                <AirbnbInput
-                                    label="Estado"
-                                    variant="dark"
-                                    value={address.state}
-                                    onChangeText={(t) => setAddress({ ...address, state: t })}
-                                    placeholder="Estado"
-                                />
-                            </View>
-                        </View>
-                        <View className="flex-row gap-4 mt-2">
-                            <View className="flex-1">
-                                <AirbnbInput
-                                    label="C.P."
-                                    variant="dark"
-                                    value={address.zip}
-                                    onChangeText={(t) => setAddress({ ...address, zip: t })}
-                                    placeholder="12345"
-                                />
-                            </View>
-                            <View className="flex-1">
-                                <AirbnbInput
-                                    label="País"
-                                    variant="dark"
-                                    value={address.country}
-                                    onChangeText={(t) => setAddress({ ...address, country: t })}
-                                    placeholder="México"
-                                />
-                            </View>
-                        </View>
-                    </AirbnbCard>
-                    <View className="mt-4">
-                        <AirbnbInput
-                            label="Google Place ID"
-                            variant="dark"
-                            value={googlePlaceId}
-                            onChangeText={setGooglePlaceId}
-                            placeholder="ChIJN1t_tDeuEmsRUsoyG83VY24"
-                        />
-                        <View className="flex-row items-center justify-between mt-1">
-                            <Text className="text-slate-500 text-xs flex-1 mr-4">
-                                Usado para redirigir a los clientes satisfechos a dejar una reseña en Google.
-                            </Text>
+                            <Text className="text-slate-400 text-xs mb-3">Identificador único del lugar en Google Maps</Text>
+                            <AirbnbInput
+                                label=""
+                                variant="dark"
+                                value={googlePlaceId}
+                                onChangeText={setGooglePlaceId}
+                                placeholder="ChIJ..."
+                            />
+
                             <TouchableOpacity
-                                onPress={() => Linking.openURL('https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder')}
-                                className="flex-row items-center bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"
+                                onPress={fetchCoordinates}
+                                disabled={uploading || !googlePlaceId}
+                                className="bg-indigo-600 w-full py-3 rounded-xl flex-row items-center justify-center mt-2"
                             >
-                                <ExternalLink size={12} color="#6366f1" className="mr-2" />
-                                <Text className="text-indigo-400 text-xs font-bold">Buscar ID</Text>
+                                {uploading ? (
+                                    <Clock size={20} color="white" className="mr-2" />
+                                ) : (
+                                    <MapPin size={20} color="white" className="mr-2" />
+                                )}
+                                <Text className="text-white font-bold">
+                                    {uploading ? 'Verificando...' : 'Confirmar Google Place ID'}
+                                </Text>
                             </TouchableOpacity>
                         </View>
-                    </View>
+
+                        {coordinates ? (
+                            <View className="bg-green-500/10 p-3 rounded-lg flex-row items-center mb-6 border border-green-500/20">
+                                <View className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+                                <Text className="text-green-400 text-sm font-medium">
+                                    {locationName ? `Ubicación confirmada: ${locationName}` : 'Ubicación confirmada correctamente.'}
+                                </Text>
+                            </View>
+                        ) : (
+                            <View className="bg-slate-800 p-3 rounded-lg flex-row items-center mb-6 border border-slate-700">
+                                <View className="w-2 h-2 rounded-full bg-yellow-500 mr-2" />
+                                <Text className="text-slate-300 text-sm">No se han guardado coordenadas.</Text>
+                            </View>
+                        )}
+
+                        <View className="border-t border-slate-700 pt-4">
+                            <View className="flex-row items-center justify-between mb-4">
+                                <View>
+                                    <Text className="text-white font-medium">Restricción de Radio</Text>
+                                    <Text className="text-slate-400 text-xs">Limitar pedidos a una distancia especifica</Text>
+                                </View>
+                                <Switch
+                                    trackColor={{ false: "#334155", true: "#059669" }}
+                                    thumbColor={locationRestriction.enabled ? "#ffffff" : "#cbd5e1"}
+                                    onValueChange={(val) => setLocationRestriction(prev => ({ ...prev, enabled: val }))}
+                                    value={locationRestriction.enabled}
+                                />
+                            </View>
+
+                            {locationRestriction.enabled && (
+                                <View>
+                                    <View className="flex-row justify-between mb-2">
+                                        <Text className="text-slate-300 text-sm">Radio Máximo</Text>
+                                        <Text className="text-indigo-400 text-sm font-bold">{locationRestriction.radius_meters} metros</Text>
+                                    </View>
+                                    <TextInput
+                                        className="bg-slate-800 text-white px-4 py-3 rounded-xl border border-slate-700 font-bold text-lg"
+                                        keyboardType="numeric"
+                                        value={String(locationRestriction.radius_meters)}
+                                        onChangeText={(t) => {
+                                            const val = parseInt(t) || 0;
+                                            setLocationRestriction(prev => ({ ...prev, radius_meters: val }));
+                                        }}
+                                        placeholder="1000"
+                                    />
+                                    <Text className="text-slate-500 text-xs mt-2">
+                                        Los clientes fuera de este radio no podrán enviar pedidos a la cocina.
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
+                    </AirbnbCard>
                 </View>
 
                 {/* Takeout QR Section */}
@@ -385,6 +438,52 @@ export default function SettingsScreen() {
                         </AirbnbCard>
                     </View>
                 )}
+                {/* Place ID Info Modal */}
+                <Modal
+                    visible={showPlaceIdInfo}
+                    transparent
+                    animationType="fade"
+                    onRequestClose={() => setShowPlaceIdInfo(false)}
+                >
+                    <View className="flex-1 bg-black/80 justify-center items-center p-4">
+                        <View className="bg-slate-900 w-full max-w-md p-6 rounded-2xl border border-slate-700">
+                            <View className="flex-row justify-between items-center mb-4">
+                                <Text className="text-xl font-bold text-white">¿Cómo encontrar mi Place ID?</Text>
+                                <TouchableOpacity onPress={() => setShowPlaceIdInfo(false)}>
+                                    <X size={24} color="#94a3b8" />
+                                </TouchableOpacity>
+                            </View>
+
+                            <Text className="text-slate-300 mb-4 leading-6">
+                                El <Text className="font-bold text-white">Place ID</Text> es un código único que Google Maps usa para identificar tu negocio.
+                            </Text>
+
+                            <View className="bg-slate-800 p-4 rounded-xl mb-4">
+                                <Text className="text-white font-bold mb-2">Pasos para encontrarlo:</Text>
+                                <Text className="text-slate-400 mb-2">1. Ve al "Place ID Finder" de Google Developers.</Text>
+                                <Text className="text-slate-400 mb-2">2. Escribe el nombre de tu restaurante en el mapa.</Text>
+                                <Text className="text-slate-400">3. Copia el código que aparece como "Place ID".</Text>
+                            </View>
+
+                            <TouchableOpacity
+                                onPress={() => {
+                                    Linking.openURL('https://developers.google.com/maps/documentation/places/web-service/place-id#find-id');
+                                }}
+                                className="flex-row items-center justify-center bg-indigo-600/20 p-4 rounded-xl mb-4"
+                            >
+                                <Text className="text-indigo-400 font-bold mr-2">Abrir Buscador de Place ID</Text>
+                                <ExternalLink size={16} color="#818cf8" />
+                            </TouchableOpacity>
+
+                            <TouchableOpacity
+                                onPress={() => setShowPlaceIdInfo(false)}
+                                className="bg-slate-800 py-3 rounded-xl items-center"
+                            >
+                                <Text className="text-white font-bold">Entendido</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
             </ScrollView>
 
             {/* Branding Modal */}
