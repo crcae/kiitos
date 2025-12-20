@@ -29,6 +29,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Kiitos to scan QR codes for table ordering."
+        }
+      ],
       "@react-native-community/datetimepicker"
     ]
   }
