@@ -11,13 +11,11 @@ import {
     getCategories, createCategory, updateCategory, deleteCategory,
     subscribeToCategories, subscribeToProducts, subscribeToRestaurantConfig, updateRestaurantConfig
 } from '../../../src/services/menu';
-import BrandingColorPicker from '../../../src/components/BrandingColorPicker';
 import { RestaurantSettings } from '../../../src/types/firestore';
 import { uploadImage } from '../../../src/services/storage';
 import { Product, Category, ModifierGroup, ModifierOption } from '../../../src/types/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import { Image } from 'react-native';
-import QRCode from 'react-native-qrcode-svg';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../src/context/AuthContext';
 import { useRestaurant } from '../../../src/hooks/useRestaurant';
@@ -48,21 +46,12 @@ export default function MenuManagementScreen() {
     // Removed activeTab since we show both
     const [categories, setCategories] = useState<Category[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
-    const [allowGuestOrdering, setAllowGuestOrdering] = useState(false); // Should fetch initially
     const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
     // UI State
     const [categoryModalVisible, setCategoryModalVisible] = useState(false);
     const [productModalVisible, setProductModalVisible] = useState(false);
     const [uploading, setUploading] = useState(false);
-    const [enableTakeout, setEnableTakeout] = useState(false);
-
-    const [qrModalVisible, setQrModalVisible] = useState(false);
-    const [brandingModalVisible, setBrandingModalVisible] = useState(false);
-
-    // Branding State
-    const [brandingLogo, setBrandingLogo] = useState<string | null>(null);
-    const [brandingColor, setBrandingColor] = useState('#F97316'); // Default Orange
 
     // Form State
     const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -92,12 +81,7 @@ export default function MenuManagementScreen() {
         });
 
         const unsubscribeConfig = subscribeToRestaurantConfig(restaurantId, (config) => {
-            setAllowGuestOrdering(config.allow_guest_ordering ?? false);
-            setEnableTakeout(config.enable_takeout ?? false);
-            if (config.branding) {
-                setBrandingLogo(config.branding.logo_url || null);
-                setBrandingColor(config.branding.primary_color || '#F97316');
-            }
+            // Config is now managed in Settings, but we might still need some values if they affect Menu UI
         });
 
         return () => {
@@ -330,61 +314,6 @@ export default function MenuManagementScreen() {
         setProductModalVisible(true);
     };
 
-    const toggleGuestOrdering = async (val: boolean) => {
-        setAllowGuestOrdering(val);
-        try {
-            await updateRestaurantConfig(restaurantId, { allow_guest_ordering: val });
-        } catch (e) {
-            console.error(e);
-            Alert.alert('Error', 'Failed to update config');
-            setAllowGuestOrdering(!val); // Revert
-        }
-    };
-
-    const toggleTakeout = async (val: boolean) => {
-        setEnableTakeout(val);
-        try {
-            await updateRestaurantConfig(restaurantId, { enable_takeout: val });
-        } catch (e) {
-            console.error(e);
-            Alert.alert('Error', 'Failed to update config');
-            setEnableTakeout(!val); // Revert
-        }
-    };
-
-    const handleSaveBranding = async () => {
-        try {
-            setUploading(true);
-            let logoUrl = brandingLogo;
-
-            // Check if it's a new local image (starts with file:// or similar, not http)
-            if (brandingLogo && !brandingLogo.startsWith('http')) {
-                try {
-                    const filename = `branding/logo_${Date.now()}.jpg`;
-                    logoUrl = await uploadImage(brandingLogo, `restaurants/${restaurantId}/${filename}`);
-                } catch (uploadError: any) {
-                    console.error("Upload failed", uploadError);
-                    Alert.alert('Error', 'No se pudo subir el logo. Inténtalo de nuevo.');
-                    setUploading(false);
-                    return;
-                }
-            }
-
-            const brandingData = {
-                logo_url: logoUrl || undefined,
-                primary_color: brandingColor,
-            };
-
-            await updateRestaurantConfig(restaurantId, { branding: brandingData });
-            setBrandingModalVisible(false);
-            Alert.alert('Éxito', 'Configuración de marca actualizada');
-        } catch (e: any) {
-            console.error(e);
-            Alert.alert('Error', 'Failed to save branding: ' + e.message);
-        } finally {
-            setUploading(false);
-        }
-    };
 
     // ...
 
@@ -422,13 +351,6 @@ export default function MenuManagementScreen() {
                         </TouchableOpacity>
                         <TouchableOpacity
                             className="bg-slate-800 p-2 rounded-lg border border-slate-700 flex-row items-center"
-                            onPress={() => setBrandingModalVisible(true)}
-                        >
-                            <View className="mr-2"><Text>🎨</Text></View>
-                            <Text className="text-slate-300 text-xs font-bold">Marca</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            className="bg-slate-800 p-2 rounded-lg border border-slate-700 flex-row items-center"
                             onPress={() => {
                                 if (restaurantId) {
                                     router.push(`/takeout/${restaurantId}` as any);
@@ -441,72 +363,8 @@ export default function MenuManagementScreen() {
                     </View>
                 </View>
 
-                {/* Toggles Row */}
-                <View className="flex-row flex-wrap gap-4">
-                    {/* Guest Ordering Toggle */}
-                    <View className="flex-row items-center space-x-3 bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
-                        <Text className={`font-medium ${allowGuestOrdering ? 'text-green-400' : 'text-slate-400'}`}>
-                            {allowGuestOrdering ? 'Guest Ordering ON' : 'Guest Ordering OFF'}
-                        </Text>
-                        <Switch
-                            trackColor={{ false: "#334155", true: "#059669" }}
-                            thumbColor={allowGuestOrdering ? "#ffffff" : "#cbd5e1"}
-                            ios_backgroundColor="#334155"
-                            onValueChange={toggleGuestOrdering}
-                            value={allowGuestOrdering}
-                        />
-                    </View>
-
-                    {/* Takeout Module Toggle */}
-                    <View className="flex-row items-center space-x-3 bg-slate-800 px-4 py-2 rounded-full border border-slate-700">
-                        <Text className={`font-medium ${enableTakeout ? 'text-orange-400' : 'text-slate-400'}`}>
-                            {enableTakeout ? 'Takeout ON' : 'Takeout OFF'}
-                        </Text>
-                        <Switch
-                            trackColor={{ false: "#334155", true: "#ea580c" }} // Slate / Orange
-                            thumbColor={enableTakeout ? "#ffffff" : "#cbd5e1"}
-                            ios_backgroundColor="#334155"
-                            onValueChange={toggleTakeout}
-                            value={enableTakeout}
-                        />
-                    </View>
-
-                    {/* QR Button */}
-                    {enableTakeout && (
-                        <TouchableOpacity
-                            onPress={() => setQrModalVisible(true)}
-                            className="bg-orange-600 px-4 py-2 rounded-full"
-                        >
-                            <Text className="text-white font-bold text-xs">Ver QR Takeout</Text>
-                        </TouchableOpacity>
-                    )}
-                </View>
             </View>
 
-            {/* QR Code Modal */}
-            <Modal visible={qrModalVisible} transparent animationType="fade">
-                <View className="flex-1 justify-center items-center bg-black/80 p-4">
-                    <View className="bg-white p-6 rounded-2xl items-center w-full max-w-sm">
-                        <Text className="text-xl font-bold mb-2 text-stone-900">QR de Takeout</Text>
-                        <Text className="text-stone-500 text-sm mb-6 text-center">Escanea para abrir el menú de pedidos para llevar</Text>
-
-                        {/* QR Placeholder - In real app use react-native-qrcode-svg */}
-                        <View className="w-64 h-64 bg-white items-center justify-center rounded-xl mb-6 overflow-hidden">
-                            <QRCode
-                                value={`https://kiitos.app/takeout/${restaurantId}`}
-                                size={250}
-                            />
-                        </View>
-
-                        <TouchableOpacity
-                            onPress={() => setQrModalVisible(false)}
-                            className="bg-stone-900 w-full py-3 rounded-xl"
-                        >
-                            <Text className="text-white text-center font-bold">Cerrar</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
 
             {/* Two Column Layout */}
             <View className="flex-1 flex-col md:flex-row">
@@ -838,106 +696,6 @@ export default function MenuManagementScreen() {
                 )}
             </Modal>
 
-            {/* Branding Modal */}
-            <Modal visible={brandingModalVisible} transparent animationType="fade">
-                {Platform.OS === 'web' ? (
-                    <View className="flex-1 justify-center items-center bg-black/60 px-4">
-                        <View className="bg-white w-full max-w-sm rounded-2xl overflow-hidden max-h-[90%]">
-                            <ScrollView contentContainerStyle={{ padding: 24 }}>
-                                <Text className="text-xl font-bold mb-4 text-slate-900">Personalizar Marca</Text>
-
-                                <Text className="text-sm font-medium text-slate-700 mb-2">Logo del Restaurante</Text>
-                                <TouchableOpacity onPress={() => pickImage(setBrandingLogo)} className="mb-6 items-center justify-center h-32 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 overflow-hidden">
-                                    {brandingLogo ? (
-                                        <Image source={{ uri: brandingLogo }} className="w-full h-full" resizeMode="contain" />
-                                    ) : (
-                                        <View className="items-center">
-                                            <Text className="text-2xl mb-1">📷</Text>
-                                            <Text className="text-slate-500">Subir Logo</Text>
-                                        </View>
-                                    )}
-                                </TouchableOpacity>
-
-                                <Text className="text-sm font-medium text-slate-700 mb-2">Color Primario</Text>
-                                <View className="mb-6">
-                                    <BrandingColorPicker
-                                        value={brandingColor}
-                                        onComplete={(color) => setBrandingColor(color)}
-                                    />
-                                </View>
-
-                                <View className="flex-row items-center mb-6">
-                                    <Text className="text-slate-500 mr-4">Vista Previa:</Text>
-                                    <View
-                                        style={{ backgroundColor: brandingColor, width: 40, height: 40, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}
-                                    />
-                                    <View className="ml-4 px-3 py-2 rounded-lg" style={{ backgroundColor: brandingColor }}>
-                                        <Text className="text-white font-bold text-xs">Botón</Text>
-                                    </View>
-                                </View>
-
-                                <View className="flex-row justify-end space-x-2">
-                                    <TouchableOpacity onPress={() => setBrandingModalVisible(false)} className="px-4 py-2">
-                                        <Text className="text-slate-500 font-medium">Cancelar</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity onPress={handleSaveBranding} disabled={uploading} className="bg-indigo-600 px-4 py-2 rounded-lg">
-                                        <Text className="text-white font-medium">{uploading ? 'Guardando...' : 'Guardar'}</Text>
-                                    </TouchableOpacity>
-                                </View>
-                            </ScrollView>
-                        </View>
-                    </View>
-                ) : (
-                    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1 justify-center items-center bg-black/60 px-4">
-                            <View className="bg-white w-full max-w-sm rounded-2xl overflow-hidden max-h-[80%]">
-                                <ScrollView contentContainerStyle={{ padding: 24 }}>
-                                    <Text className="text-xl font-bold mb-4 text-slate-900">Personalizar Marca</Text>
-
-                                    <Text className="text-sm font-medium text-slate-700 mb-2">Logo del Restaurante</Text>
-                                    <TouchableOpacity onPress={() => pickImage(setBrandingLogo)} className="mb-6 items-center justify-center h-32 bg-slate-100 rounded-lg border-2 border-dashed border-slate-300 overflow-hidden">
-                                        {brandingLogo ? (
-                                            <Image source={{ uri: brandingLogo }} className="w-full h-full" resizeMode="contain" />
-                                        ) : (
-                                            <View className="items-center">
-                                                <Text className="text-2xl mb-1">📷</Text>
-                                                <Text className="text-slate-500">Subir Logo</Text>
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-
-                                    <Text className="text-sm font-medium text-slate-700 mb-2">Color Primario</Text>
-                                    <View className="mb-6">
-                                        <BrandingColorPicker
-                                            value={brandingColor}
-                                            onComplete={(color) => setBrandingColor(color)}
-                                        />
-                                    </View>
-
-                                    <View className="flex-row items-center mb-6">
-                                        <Text className="text-slate-500 mr-4">Vista Previa:</Text>
-                                        <View
-                                            style={{ backgroundColor: brandingColor, width: 40, height: 40, borderRadius: 8, borderWidth: 1, borderColor: '#e2e8f0' }}
-                                        />
-                                        <View className="ml-4 px-3 py-2 rounded-lg" style={{ backgroundColor: brandingColor }}>
-                                            <Text className="text-white font-bold text-xs">Botón</Text>
-                                        </View>
-                                    </View>
-
-                                    <View className="flex-row justify-end space-x-2">
-                                        <TouchableOpacity onPress={() => setBrandingModalVisible(false)} className="px-4 py-2">
-                                            <Text className="text-slate-500 font-medium">Cancelar</Text>
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={handleSaveBranding} disabled={uploading} className="bg-indigo-600 px-4 py-2 rounded-lg">
-                                            <Text className="text-white font-medium">{uploading ? 'Guardando...' : 'Guardar'}</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </ScrollView>
-                            </View>
-                        </KeyboardAvoidingView>
-                    </TouchableWithoutFeedback>
-                )}
-            </Modal>
         </View>
     );
 }

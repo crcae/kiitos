@@ -70,6 +70,35 @@ export interface RestaurantSettings {
         accent_color?: string;
         font_style?: 'modern' | 'serif' | 'mono';
     };
+    opening_hours?: {
+        [key: string]: { open: string; close: string; closed?: boolean };
+    };
+    address?: RestaurantAddress;
+    google_place_id?: string;
+    coordinates?: {
+        lat: number;
+        lng: number;
+    };
+    location_name?: string;
+    location_restriction?: {
+        enabled: boolean;
+        radius_meters: number;
+    };
+}
+
+// ============================================
+// REVIEWS
+// ============================================
+
+export interface Review {
+    id: string;
+    rating: number; // 1 to 5
+    comment?: string;
+    customer_name?: string;
+    customer_phone?: string;
+    order_id?: string;
+    status: 'internal' | 'redirected_to_google';
+    createdAt: Timestamp;
 }
 
 export interface Subscription {
@@ -170,6 +199,12 @@ export interface OrderItem {
 export type SessionStatus = 'active' | 'closed' | 'partial_payment';
 export type PaymentStatus = 'unpaid' | 'paid' | 'partial' | 'refunded';
 
+export interface SessionStaff {
+    id: string;
+    name: string;
+    joinedAt: Timestamp;
+}
+
 export interface Session {
     id: string;
     restaurantId: string; // Tenant isolation
@@ -189,6 +224,8 @@ export interface Session {
     paymentStatus: PaymentStatus;
     qrCode: string;
     guestCount?: number;
+    staff?: SessionStaff[];
+    staff_ids?: string[];
 }
 
 export interface Order {

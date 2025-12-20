@@ -2,26 +2,30 @@ import React, { useState } from 'react';
 import { TextInput, View, Text, StyleSheet, TextInputProps } from 'react-native';
 import { colors, spacing, borderRadius, typography, shadows } from '../styles/theme';
 
+type InputVariant = 'light' | 'dark';
+
 interface AirbnbInputProps extends TextInputProps {
     label: string;
     error?: string;
+    variant?: InputVariant;
 }
 
-export default function AirbnbInput({ label, error, ...props }: AirbnbInputProps) {
+export default function AirbnbInput({ label, error, variant = 'light', ...props }: AirbnbInputProps) {
     const [isFocused, setIsFocused] = useState(false);
 
     return (
         <View style={styles.container}>
-            <Text style={styles.label}>{label}</Text>
+            <Text style={[styles.label, styles[`${variant}Label`]]}>{label}</Text>
             <TextInput
                 style={[
                     styles.input,
+                    styles[`${variant}Input`],
                     isFocused && styles.inputFocused,
                     error && styles.inputError,
                 ]}
                 onFocus={() => setIsFocused(true)}
                 onBlur={() => setIsFocused(false)}
-                placeholderTextColor={colors.gray}
+                placeholderTextColor={variant === 'light' ? colors.gray : '#94a3b8'}
                 {...props}
             />
             {error && <Text style={styles.errorText}>{error}</Text>}
@@ -36,20 +40,32 @@ const styles = StyleSheet.create({
     label: {
         fontSize: typography.sm,
         fontWeight: typography.semibold,
-        color: colors.darkText,
         marginBottom: spacing.xs,
     },
+    lightLabel: {
+        color: colors.darkText,
+    },
+    darkLabel: {
+        color: '#e2e8f0', // slate-200
+    },
     input: {
-        backgroundColor: colors.white,
         borderRadius: borderRadius.md,
         borderWidth: 1,
-        borderColor: colors.lightGray,
         paddingVertical: spacing.md,
         paddingHorizontal: spacing.lg,
         fontSize: typography.base,
-        color: colors.darkText,
         minHeight: 48,
         ...shadows.sm,
+    },
+    lightInput: {
+        backgroundColor: colors.white,
+        borderColor: colors.lightGray,
+        color: colors.darkText,
+    },
+    darkInput: {
+        backgroundColor: '#1e293b', // slate-800
+        borderColor: '#334155', // slate-700
+        color: colors.white,
     },
     inputFocused: {
         borderColor: colors.roastedSaffron,

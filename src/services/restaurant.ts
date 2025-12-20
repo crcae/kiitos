@@ -28,3 +28,16 @@ export const updateRestaurantConfig = async (configUpdates: any) => {
     const docRef = doc(db, 'restaurants', RESTAURANT_ID);
     await setDoc(docRef, { settings: configUpdates }, { merge: true });
 };
+
+export const getRestaurant = async (id: string = RESTAURANT_ID): Promise<Restaurant | null> => {
+    try {
+        const docRef = doc(db, 'restaurants', id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            return { id: docSnap.id, ...docSnap.data() } as Restaurant;
+        }
+    } catch (error) {
+        console.error('Error fetching restaurant:', error);
+    }
+    return null;
+};

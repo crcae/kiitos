@@ -142,6 +142,14 @@ export const deleteStaffMember = async (
     await deleteDoc(getStaffDocRef(restaurantId, staffId));
 };
 
+export const getStaff = async (restaurantId: string): Promise<StaffMember[]> => {
+    const snap = await getDocs(getStaffCollectionRef(restaurantId));
+    return snap.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+    } as StaffMember));
+};
+
 // ============================================
 // UTILITIES
 // ============================================

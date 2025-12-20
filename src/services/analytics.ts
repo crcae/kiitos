@@ -142,3 +142,60 @@ export const formatSessionsForCSV = (sessions: Session[]) => {
         paymentStatus: s.paymentStatus
     }));
 };
+
+/**
+ * Fetches sessions where a specific waiter was involved
+ */
+export const getWaiterSessions = async (
+    restaurantId: string,
+    waiterId: string,
+    startDate: Date,
+    endDate: Date
+): Promise<Session[]> => {
+    const sessionsRef = collection(db, 'restaurants', restaurantId, 'sessions');
+    const q = query(
+        sessionsRef,
+        where('staff_ids', 'array-contains', waiterId),
+        where('startTime', '>=', Timestamp.fromDate(startDate)),
+        where('startTime', '<=', Timestamp.fromDate(endDate)),
+        orderBy('startTime', 'desc')
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Session));
+};
+
+/**
+ * Calculates metrics for a specific waiter
+ */
+export const calculateWaiterMetrics = async (
+    restaurantId: string,
+    sessions: Session[],
+    waiterId: string
+): Promise<{ totalSales: number; totalTips: number; sessionCount: number }> => {
+    let totalSales = 0;
+    let totalTips = 0;
+
+    for (const session of sessions) {
+        // Calculate sales attributed to this waiter (for now, total session value if they were involved)
+        // In a more complex system, we might attribute specific items to waiters
+        totalSales += session.total || 0;
+
+        // Fetch payments to get tips
+        const paymentsRef = collection(db, 'restaurants', restaurantId, 'sessions', session.id, 'payments');
+        const paymentsSnap = await getDocs(paymentsRef);
+
+        paymentsSnap.forEach(doc => {
+            const payment = doc.data() as Payment;
+            // If the payment was created by this waiter or they were part of the session
+            // For now, we sum all tips in sessions they served
+            totalTips += payment.tip || 0;
+        });
+    }
+
+    return {
+        totalSales,
+        totalTips,
+        sessionCount: sessions.length
+    };
+};

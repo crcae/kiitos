@@ -4,8 +4,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import PaymentInterface from '../../src/components/PaymentInterface';
 import { colors } from '../../src/styles/theme';
 
-type SplitMode = 'full' | 'items' | 'equal' | 'custom';
-
 export default function ClientPayScreen() {
     const { id, restaurantId, mode } = useLocalSearchParams<{ id: string, restaurantId: string, mode?: 'guest' | 'waiter' }>();
     const router = useRouter();
@@ -23,11 +21,9 @@ export default function ClientPayScreen() {
             <PaymentInterface
                 sessionId={id}
                 restaurantId={restaurantId}
-                onClose={() => router.back()}
+                onClose={() => router.back()} // Ensure back navigation works
                 mode={mode as 'guest' | 'waiter'}
             />
         </View>
     );
 }
-
-

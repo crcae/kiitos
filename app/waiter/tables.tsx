@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { LogOut } from 'lucide-react-native';
+import { LogOut, LayoutDashboard } from 'lucide-react-native';
 import { subscribeToTables } from '../../src/services/tables';
 import { createSession } from '../../src/services/sessions';
 import { Table } from '../../src/types/firestore';
@@ -66,10 +66,17 @@ export default function TablesScreen() {
                     <Text style={styles.title}>Mesas</Text>
                 </View>
 
-                <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
-                    <LogOut size={20} color={colors.white} />
-                    <Text style={styles.logoutText}>Salir</Text>
-                </TouchableOpacity>
+                <View style={styles.headerButtons}>
+                    <TouchableOpacity onPress={() => router.push('/waiter/dashboard')} style={styles.dashboardButton}>
+                        <LayoutDashboard size={20} color={colors.white} />
+                        <Text style={styles.buttonText}>Dashboard</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+                        <LogOut size={20} color={colors.white} />
+                        <Text style={styles.buttonText}>Salir</Text>
+                    </TouchableOpacity>
+                </View>
             </View>
 
             <FlatList
@@ -111,6 +118,19 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         color: '#1E293B',
     },
+    headerButtons: {
+        flexDirection: 'row',
+        gap: 8,
+    },
+    dashboardButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#3B82F6', // Blue-500
+        paddingVertical: 8,
+        paddingHorizontal: 12,
+        borderRadius: 8,
+        gap: 6
+    },
     logoutButton: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -120,7 +140,7 @@ const styles = StyleSheet.create({
         borderRadius: 8,
         gap: 6
     },
-    logoutText: {
+    buttonText: {
         color: '#FFFFFF',
         fontWeight: 'bold',
         fontSize: 14
