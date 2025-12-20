@@ -75,6 +75,15 @@ export interface RestaurantSettings {
     };
     address?: RestaurantAddress;
     google_place_id?: string;
+    coordinates?: {
+        lat: number;
+        lng: number;
+    };
+    location_name?: string;
+    location_restriction?: {
+        enabled: boolean;
+        radius_meters: number;
+    };
 }
 
 export interface Subscription {
