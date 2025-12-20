@@ -86,6 +86,21 @@ export interface RestaurantSettings {
     };
 }
 
+// ============================================
+// REVIEWS
+// ============================================
+
+export interface Review {
+    id: string;
+    rating: number; // 1 to 5
+    comment?: string;
+    customer_name?: string;
+    customer_phone?: string;
+    order_id?: string;
+    status: 'internal' | 'redirected_to_google';
+    createdAt: Timestamp;
+}
+
 export interface Subscription {
     plan: SubscriptionPlan;
     status: SubscriptionStatus;

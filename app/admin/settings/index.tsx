@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Modal, Image, Platform, TextInput, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ArrowLeft, Save, Clock, MapPin, Palette, Globe, QrCode, Info, X, ExternalLink } from 'lucide-react-native';
+
+import { Linking } from 'react-native';
+
 import { useRouter } from 'expo-router';
 import AirbnbButton from '../../../src/components/AirbnbButton';
 import AirbnbInput from '../../../src/components/AirbnbInput';
