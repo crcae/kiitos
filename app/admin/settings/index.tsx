@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Modal, Image, Platform, TextInput } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Save, Clock, MapPin, Palette, Globe, QrCode } from 'lucide-react-native';
+import { ArrowLeft, Save, Clock, MapPin, Palette, Globe, QrCode, ExternalLink } from 'lucide-react-native';
+import { Linking } from 'react-native';
 import { useRouter } from 'expo-router';
 import AirbnbButton from '../../../src/components/AirbnbButton';
 import AirbnbInput from '../../../src/components/AirbnbInput';
@@ -341,9 +342,18 @@ export default function SettingsScreen() {
                             onChangeText={setGooglePlaceId}
                             placeholder="ChIJN1t_tDeuEmsRUsoyG83VY24"
                         />
-                        <Text className="text-slate-500 text-xs">
-                            Usado para mostrar reseñas y ubicación exacta en Google Maps.
-                        </Text>
+                        <View className="flex-row items-center justify-between mt-1">
+                            <Text className="text-slate-500 text-xs flex-1 mr-4">
+                                Usado para redirigir a los clientes satisfechos a dejar una reseña en Google.
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => Linking.openURL('https://developers.google.com/maps/documentation/javascript/examples/places-placeid-finder')}
+                                className="flex-row items-center bg-slate-800 px-3 py-1.5 rounded-lg border border-slate-700"
+                            >
+                                <ExternalLink size={12} color="#6366f1" className="mr-2" />
+                                <Text className="text-indigo-400 text-xs font-bold">Buscar ID</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 </View>
 

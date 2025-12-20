@@ -12,7 +12,8 @@ import {
     LogOut,
     ChevronLeft,
     ChevronRight,
-    Settings
+    Settings,
+    Star
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 
@@ -60,6 +61,7 @@ export default function AdminSidebar({
         { title: 'Cuentas', icon: ReceiptText, route: '/admin/bills' },
         { title: 'Pagos', icon: CreditCard, route: '/admin/payments' },
         { title: 'Ventas', icon: BarChart3, route: '/admin/sales' },
+        { title: 'Reseñas', icon: Star, route: '/admin/reviews' },
         { title: 'Estadísticas Staff', icon: Users, route: '/admin/staff-stats' },
         { title: 'Configuración', icon: Settings, route: '/admin/settings' },
     ];
