@@ -161,7 +161,7 @@ export default function MarketplaceHome() {
                 style={{ top: 60, zIndex: 5 }}
             >
                 <Text className="text-white tracking-tighter" style={{ fontSize: 42, fontWeight: '900', letterSpacing: -1 }}>
-                    Kiitos<Text style={{ color: '#f89219' }}>.</Text>
+                    Kitos<Text style={{ color: '#f89219' }}>.</Text>
                 </Text>
             </View>
 
