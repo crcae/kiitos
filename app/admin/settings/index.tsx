@@ -420,14 +420,20 @@ export default function SettingsScreen() {
                                 </View>
                             </View>
 
-                            <ColorPicker
-                                style={{ width: '100%' }}
-                                value={brandingColor}
-                                onComplete={({ hex }) => setBrandingColor(hex)}
-                            >
-                                <Panel1 style={{ height: 160, borderRadius: 12, marginBottom: 16 }} />
-                                <HueSlider style={{ height: 30, borderRadius: 15, marginBottom: 16 }} />
-                            </ColorPicker>
+                            <View style={{ width: '100%', marginTop: 8 }}>
+                                <ColorPicker
+                                    style={{ width: '100%' }}
+                                    value={brandingColor}
+                                    onComplete={({ hex }) => setBrandingColor(hex)}
+                                >
+                                    <View style={{ height: 180, width: '100%', marginBottom: 16, overflow: 'hidden', borderRadius: 12 }}>
+                                        <Panel1 style={{ flex: 1 }} />
+                                    </View>
+                                    <View style={{ height: 35, width: '100%', marginBottom: 16 }}>
+                                        <HueSlider style={{ flex: 1, borderRadius: 17.5 }} />
+                                    </View>
+                                </ColorPicker>
+                            </View>
 
                             <Text className="text-slate-500 text-[10px] mt-3 italic">
                                 Desliza para cambiar el tono o escribe el código HEX manualmente.
