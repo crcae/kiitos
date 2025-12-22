@@ -1,34 +1,56 @@
 import React from 'react';
-import { View, TouchableOpacity, Text } from 'react-native';
-import { useRouter } from 'expo-router';
+import { View, TouchableOpacity } from 'react-native';
+import { useRouter, usePathname } from 'expo-router';
 import { ShoppingBag, ScanLine, User } from 'lucide-react-native';
+import { useMarketStore } from '../../store/marketStore';
 
-interface FloatingTabMenuProps {
-    activeTab: 'marketplace' | 'scan' | 'profile';
-    onTabPress?: (tab: 'marketplace' | 'scan' | 'profile') => void;
-}
-
-export function FloatingTabMenu({ activeTab, onTabPress }: FloatingTabMenuProps) {
+// Accepts what standard custom tab bars accept (props.state, props.navigation, etc.)
+// But we can keep it flexible if we want to support manual usage too (optional)
+export function FloatingTabMenu(props: any) {
     const router = useRouter();
+    const pathname = usePathname();
+    const { triggerAction } = useMarketStore();
+
+    // Determine active tab based on router state (passed via props from Tabs) OR current pathname fallback
+    // If used as tabBar, props.state.index gives us the active route index.
+    let activeTab = 'marketplace';
+
+    if (props.state && props.state.routes) {
+        const routeName = props.state.routes[props.state.index].name;
+        // Map route names to our internal tab keys
+        if (routeName === 'profile') activeTab = 'profile';
+        else if (routeName === 'marketplace') activeTab = 'marketplace';
+    } else {
+        // Fallback for standalone usage (though we should avoid this now)
+        if (pathname.includes('profile')) activeTab = 'profile';
+    }
 
     const handlePress = (tab: 'marketplace' | 'scan' | 'profile') => {
-        if (onTabPress) {
-            onTabPress(tab);
-            return;
-        }
-
-        // Default Navigation Logic if no override provided
+        // Use router.replace to avoid stacking screens infinitely
         switch (tab) {
             case 'marketplace':
-                // Navigate to list view
-                router.push({ pathname: '/(tabs)/marketplace', params: { view: 'list' } });
+                // Set action FIRST so it's ready when the screen mounts/updates
+                // If we are already on marketplace, SCROLL_TOP
+                if (activeTab === 'marketplace') {
+                    // Toggle or just scroll top? Let's say scroll top for left button
+                    // But maybe we want to expand? Let's map it:
+                    // Left button -> "Marketplace" -> Ensure sheet is expanded or top?
+                    // Use SCROLL_DOWN to expand sheet (show full list), SCROLL_TOP to minimize (show camera)
+                    // "Shopping Bag" icon usually means "Show me the items" -> Expand Sheet (Index 1)
+                    triggerAction('SCROLL_DOWN');
+                } else {
+                    // Navigating to it, default to expanding?
+                    triggerAction('SCROLL_DOWN');
+                }
+                router.replace('/(app)/marketplace');
                 break;
             case 'scan':
-                // Navigate to camera view
-                router.push('/(tabs)/marketplace');
+                // Scan -> Minimize sheet (Index 0)
+                triggerAction('SCROLL_TOP');
+                router.replace('/(app)/marketplace');
                 break;
             case 'profile':
-                router.push('/profile');
+                router.replace('/(app)/profile');
                 break;
         }
     };

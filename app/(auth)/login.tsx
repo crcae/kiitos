@@ -10,8 +10,8 @@ import {
     ActivityIndicator
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '../src/context/AuthContext';
-import { useTenant } from '../src/context/TenantContext';
+import { useAuth } from '../../src/context/AuthContext';
+import { useTenant } from '../../src/context/TenantContext';
 
 export default function LoginPage() {
     const router = useRouter();

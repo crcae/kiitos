@@ -3,8 +3,8 @@ import { View, Text, TouchableOpacity, ActivityIndicator, Alert, Vibration } fro
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Delete, ArrowLeft } from 'lucide-react-native';
-import { useAuth } from '../../src/context/AuthContext';
-import { useRestaurant } from '../../src/hooks/useRestaurant'; // To show restaurant name
+import { useAuth } from '../../../src/context/AuthContext';
+import { useRestaurant } from '../../../src/hooks/useRestaurant'; // To show restaurant name
 
 export default function StaffLoginScreen() {
     const { restaurantId } = useLocalSearchParams<{ restaurantId: string }>();

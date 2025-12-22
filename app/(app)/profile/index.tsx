@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Switch } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CreditCard, Clock, Receipt, Bell, Moon, CircleHelp, ChevronRight, LogOut, Wallet } from 'lucide-react-native';
-import { FloatingTabMenu } from '../../src/components/navigation/FloatingTabMenu';
 
 export default function ProfileScreen() {
     const router = useRouter();
@@ -120,7 +119,6 @@ export default function ProfileScreen() {
 
             </ScrollView>
 
-            <FloatingTabMenu activeTab="profile" />
         </View>
     );
 }
