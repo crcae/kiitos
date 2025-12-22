@@ -1,141 +1,163 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, SafeAreaView, Platform } from 'react-native';
-import { Stack } from 'expo-router';
+import { View, Text, ScrollView, StyleSheet, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
-export default function PrivacyPolicy() {
+export default function PrivacyScreen() {
     return (
         <SafeAreaView style={styles.container}>
-            <Stack.Screen options={{ title: 'Privacy Policy', headerBackTitle: 'Back' }} />
-            <ScrollView contentContainerStyle={styles.scrollContent}>
+            <StatusBar style="dark" />
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
                 <View style={styles.contentContainer}>
-                    <Text style={styles.header}>Privacy Policy</Text>
-                    <Text style={styles.lastUpdated}>Last updated: December 2025</Text>
 
-                    <Text style={styles.paragraph}>
-                        Kitos respects your privacy. This policy explains how we collect and use your data when you use our mobile application and services.
-                    </Text>
-
-                    <Text style={styles.sectionHeader}>1. Data We Collect</Text>
-
-                    <Text style={styles.subHeader}>Location Information</Text>
-                    <Text style={styles.paragraph}>
-                        We use your location to show you nearby restaurants and to calculate pickup distances. This data is used to improve your ordering experience.
-                    </Text>
-
-                    <Text style={styles.subHeader}>Camera Access</Text>
-                    <Text style={styles.paragraph}>
-                        Kitos accesses your device's camera exclusively for the purpose of scanning QR codes at restaurant tables. We do not record or store images from your camera.
-                    </Text>
-
-                    <Text style={styles.subHeader}>Payment Information</Text>
-                    <Text style={styles.paragraph}>
-                        All payments are processed securely via Stripe. We do not store your credit card details on our servers. Stripe processes your payment information in accordance with their privacy policy.
-                    </Text>
-
-                    <Text style={styles.subHeader}>Personal Information</Text>
-                    <Text style={styles.paragraph}>
-                        We collect your name and email address when you create an account. This information is used to manage your account, send order receipts, and communicate important updates.
-                    </Text>
-
-                    <Text style={styles.sectionHeader}>2. How We Use Your Data</Text>
-                    <Text style={styles.paragraph}>
-                        We use your data solely to facilitate food ordering, process payments, and improve the quality of our service. We do not sell your personal data to advertisers.
-                    </Text>
-
-                    <Text style={styles.sectionHeader}>3. Third-Party Sharing</Text>
-                    <Text style={styles.paragraph}>
-                        We share necessary data with:
-                    </Text>
-                    <View style={styles.bulletPoint}>
-                        <Text style={styles.bullet}>•</Text>
-                        <Text style={styles.paragraph}>Restaurants: To fulfill your orders and manage table service.</Text>
-                    </View>
-                    <View style={styles.bulletPoint}>
-                        <Text style={styles.bullet}>•</Text>
-                        <Text style={styles.paragraph}>Stripe: To process secure payments.</Text>
-                    </View>
-                    <View style={styles.bulletPoint}>
-                        <Text style={styles.bullet}>•</Text>
-                        <Text style={styles.paragraph}>Firebase/Google: For secure authentication and database services.</Text>
+                    {/* NEW BRANDING HEADER (Code-only, no images) */}
+                    <View style={styles.header}>
+                        <View style={styles.logoContainer}>
+                            <Text style={styles.logoText}>Kitos</Text>
+                            <Text style={styles.logoDot}>.</Text>
+                        </View>
+                        <Text style={styles.subtitle}>Privacy Policy</Text>
+                        <Text style={styles.date}>Last Updated: December 22, 2025</Text>
                     </View>
 
-                    <Text style={styles.sectionHeader}>4. Contact Us</Text>
-                    <Text style={styles.paragraph}>
-                        If you have any questions about this Privacy Policy, please contact us at:
-                    </Text>
-                    <Text style={[styles.paragraph, styles.link]}>support@kitos.app</Text>
+                    <View style={styles.divider} />
 
-                    <View style={styles.footerSpacer} />
+                    {/* LEGAL CONTENT */}
+                    <Section title="1. Introduction">
+                        <Text style={styles.text}>
+                            At Kitos, we believe in transparency. This Privacy Policy outlines how we handle your data when you use our restaurant ordering platform. By using Kitos, you agree to the collection and use of information in accordance with this policy.
+                        </Text>
+                    </Section>
+
+                    <Section title="2. Information We Collect">
+                        <Text style={styles.text}>
+                            We collect the minimum amount of data necessary to provide our service:
+                        </Text>
+                        <Bullet point="Account Info: Name and email (for receipts and identity)." />
+                        <Bullet point="Location Data: To show you restaurants nearby and estimate pickup times." />
+                        <Bullet point="Transaction Data: Payment history (processed securely by Stripe)." />
+                    </Section>
+
+                    <Section title="3. Camera Usage">
+                        <Text style={styles.text}>
+                            Our app requires access to your device's camera. This permission is used **exclusively** for scanning QR codes at restaurant tables to initiate orders. We do not record, save, or transmit any video or image data from your camera.
+                        </Text>
+                    </Section>
+
+                    <Section title="4. Data Security">
+                        <Text style={styles.text}>
+                            We implement industry-standard security measures. Your payment details are tokenized and processed by Stripe; Kitos never stores your full credit card number.
+                        </Text>
+                    </Section>
+
+                    <Section title="5. Contact & Support">
+                        <Text style={styles.text}>
+                            If you have any questions or request data deletion, please reach out to our team:
+                        </Text>
+                        <Text style={[styles.text, { fontWeight: 'bold', marginTop: 5 }]}>
+                            support@kitos.app
+                        </Text>
+                    </Section>
+
+                    <View style={{ height: 60 }} />
                 </View>
             </ScrollView>
         </SafeAreaView>
     );
 }
 
+// --- SUBCOMPONENTS ---
+const Section = ({ title, children }: { title: string, children: React.ReactNode }) => (
+    <View style={styles.section}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {children}
+    </View>
+);
+
+const Bullet = ({ point }: { point: string }) => (
+    <View style={styles.bulletRow}>
+        <Text style={styles.bulletDot}>•</Text>
+        <Text style={styles.text}>{point}</Text>
+    </View>
+);
+
+// --- STYLES ---
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#ffffff',
     },
     scrollContent: {
-        flexGrow: 1,
-        alignItems: 'center',
-        paddingVertical: 20,
+        paddingVertical: 40,
+        paddingHorizontal: 24,
     },
     contentContainer: {
         width: '100%',
-        maxWidth: 800,
-        paddingHorizontal: 24,
+        maxWidth: 800, // optimized for web
+        alignSelf: 'center',
     },
     header: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#000',
-        marginBottom: 8,
-        marginTop: 10,
+        alignItems: 'center',
+        marginBottom: 20,
     },
-    lastUpdated: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 32,
+    logoContainer: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        marginBottom: 10,
     },
-    sectionHeader: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: '#000',
-        marginTop: 24,
-        marginBottom: 12,
+    logoText: {
+        fontSize: 48,
+        fontWeight: '900',
+        color: '#000000',
+        letterSpacing: -2,
     },
-    subHeader: {
-        fontSize: 18,
+    logoDot: {
+        fontSize: 48,
+        fontWeight: '900',
+        color: '#f89219', // Brand Orange
+    },
+    subtitle: {
+        fontSize: 24,
         fontWeight: '600',
         color: '#333',
-        marginTop: 16,
-        marginBottom: 8,
+        marginTop: 5,
     },
-    paragraph: {
-        fontSize: 16,
-        lineHeight: 24,
-        color: '#333',
+    date: {
+        fontSize: 14,
+        color: '#999',
+        marginTop: 5,
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#eee',
+        marginVertical: 30,
+    },
+    section: {
+        marginBottom: 30,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#111',
         marginBottom: 12,
     },
-    bulletPoint: {
+    text: {
+        fontSize: 16,
+        lineHeight: 26,
+        color: '#444',
+    },
+    bulletRow: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
-        marginBottom: 8,
+        marginTop: 8,
         paddingLeft: 8,
     },
-    bullet: {
+    bulletDot: {
         fontSize: 16,
-        marginRight: 8,
-        color: '#333',
-        lineHeight: 24,
-    },
-    link: {
-        color: '#f89219',
-        fontWeight: '600',
-    },
-    footerSpacer: {
-        height: 60,
+        marginRight: 10,
+        color: '#444',
+        lineHeight: 26,
     },
 });
