@@ -25,7 +25,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "output": "server"
+      "output": "static"
     },
     "plugins": [
       "expo-router",
