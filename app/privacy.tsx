@@ -1,141 +1,226 @@
 import React from 'react';
-import { View, Text, ScrollView, StyleSheet, SafeAreaView, Platform } from 'react-native';
-import { Stack } from 'expo-router';
+import { View, Text, ScrollView, StyleSheet, Platform, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 
-export default function PrivacyPolicy() {
+export default function PrivacyScreen() {
     return (
-        <SafeAreaView style={styles.container}>
-            <Stack.Screen options={{ title: 'Privacy Policy', headerBackTitle: 'Back' }} />
-            <ScrollView contentContainerStyle={styles.scrollContent}>
-                <View style={styles.contentContainer}>
-                    <Text style={styles.header}>Privacy Policy</Text>
-                    <Text style={styles.lastUpdated}>Last updated: December 2025</Text>
+        <SafeAreaView style={styles.mainContainer}>
+            <StatusBar style="dark" />
+            <ScrollView
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
+                {/* The "Document Card" */}
+                <View style={styles.documentCard}>
 
-                    <Text style={styles.paragraph}>
-                        Kitos respects your privacy. This policy explains how we collect and use your data when you use our mobile application and services.
-                    </Text>
-
-                    <Text style={styles.sectionHeader}>1. Data We Collect</Text>
-
-                    <Text style={styles.subHeader}>Location Information</Text>
-                    <Text style={styles.paragraph}>
-                        We use your location to show you nearby restaurants and to calculate pickup distances. This data is used to improve your ordering experience.
-                    </Text>
-
-                    <Text style={styles.subHeader}>Camera Access</Text>
-                    <Text style={styles.paragraph}>
-                        Kitos accesses your device's camera exclusively for the purpose of scanning QR codes at restaurant tables. We do not record or store images from your camera.
-                    </Text>
-
-                    <Text style={styles.subHeader}>Payment Information</Text>
-                    <Text style={styles.paragraph}>
-                        All payments are processed securely via Stripe. We do not store your credit card details on our servers. Stripe processes your payment information in accordance with their privacy policy.
-                    </Text>
-
-                    <Text style={styles.subHeader}>Personal Information</Text>
-                    <Text style={styles.paragraph}>
-                        We collect your name and email address when you create an account. This information is used to manage your account, send order receipts, and communicate important updates.
-                    </Text>
-
-                    <Text style={styles.sectionHeader}>2. How We Use Your Data</Text>
-                    <Text style={styles.paragraph}>
-                        We use your data solely to facilitate food ordering, process payments, and improve the quality of our service. We do not sell your personal data to advertisers.
-                    </Text>
-
-                    <Text style={styles.sectionHeader}>3. Third-Party Sharing</Text>
-                    <Text style={styles.paragraph}>
-                        We share necessary data with:
-                    </Text>
-                    <View style={styles.bulletPoint}>
-                        <Text style={styles.bullet}>•</Text>
-                        <Text style={styles.paragraph}>Restaurants: To fulfill your orders and manage table service.</Text>
-                    </View>
-                    <View style={styles.bulletPoint}>
-                        <Text style={styles.bullet}>•</Text>
-                        <Text style={styles.paragraph}>Stripe: To process secure payments.</Text>
-                    </View>
-                    <View style={styles.bulletPoint}>
-                        <Text style={styles.bullet}>•</Text>
-                        <Text style={styles.paragraph}>Firebase/Google: For secure authentication and database services.</Text>
+                    {/* Header Section */}
+                    <View style={styles.header}>
+                        <View style={styles.logoRow}>
+                            <Text style={styles.logoText}>Kitos</Text>
+                            <Text style={styles.logoDot}>.</Text>
+                        </View>
+                        <Text style={styles.docTitle}>Privacy Policy</Text>
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>Last Updated: Dec 22, 2025</Text>
+                        </View>
                     </View>
 
-                    <Text style={styles.sectionHeader}>4. Contact Us</Text>
-                    <Text style={styles.paragraph}>
-                        If you have any questions about this Privacy Policy, please contact us at:
-                    </Text>
-                    <Text style={[styles.paragraph, styles.link]}>support@kitos.app</Text>
+                    <View style={styles.divider} />
 
-                    <View style={styles.footerSpacer} />
+                    {/* Content */}
+                    <View style={styles.body}>
+                        <Section title="1. Introduction">
+                            <Text style={styles.paragraph}>
+                                Welcome to Kitos. Your privacy is non-negotiable. This document explains exactly how we handle your data—transparently and securely—while you use our table-side ordering platform.
+                            </Text>
+                        </Section>
+
+                        <Section title="2. The Data We Collect">
+                            <Text style={styles.paragraph}>
+                                We believe in minimalism. We only collect what is strictly needed to get your food to your table:
+                            </Text>
+                            <Bullet point="Identity: Your name and email (to send digital receipts)." />
+                            <Bullet point="Location: To display restaurants near you and estimate pickup times." />
+                            <Bullet point="Payments: Encrypted transaction logs. We never see or store your full card number; Stripe handles that." />
+                        </Section>
+
+                        <Section title="3. Why We Need Your Camera">
+                            <Text style={styles.paragraph}>
+                                You will notice the app asks for Camera permissions. This is used for <Text style={styles.highlight}>one specific purpose</Text>: scanning QR codes at restaurant tables.
+                            </Text>
+                            <Text style={[styles.paragraph, { marginTop: 10 }]}>
+                                We do not record video, take photos, or upload camera feeds to any server. It is strictly a local scanning tool.
+                            </Text>
+                        </Section>
+
+                        <Section title="4. Sharing Data">
+                            <Text style={styles.paragraph}>
+                                We do not sell your data. We only share necessary info with:
+                            </Text>
+                            <Bullet point="Restaurants: So they know who placed the order." />
+                            <Bullet point="Stripe: To securely process your payment." />
+                        </Section>
+
+                        <Section title="5. Contact Us">
+                            <Text style={styles.paragraph}>
+                                Have a question or want your data deleted? Reach out directly:
+                            </Text>
+                            <TouchableOpacity>
+                                <Text style={styles.link}>support@kitos.app</Text>
+                            </TouchableOpacity>
+                        </Section>
+                    </View>
+
+                    {/* Footer */}
+                    <View style={styles.footer}>
+                        <Text style={styles.footerText}>© 2025 Kitos App. All rights reserved.</Text>
+                    </View>
+
                 </View>
             </ScrollView>
         </SafeAreaView>
     );
 }
 
+// --- SUBCOMPONENTS ---
+const Section = ({ title, children }: { title: string, children: React.ReactNode }) => (
+    <View style={styles.section}>
+        <Text style={styles.sectionHeader}>{title}</Text>
+        {children}
+    </View>
+);
+
+const Bullet = ({ point }: { point: string }) => (
+    <View style={styles.bulletRow}>
+        <View style={styles.bulletDot} />
+        <Text style={styles.bulletText}>{point}</Text>
+    </View>
+);
+
+// --- STYLES ---
 const styles = StyleSheet.create({
-    container: {
+    mainContainer: {
         flex: 1,
-        backgroundColor: '#fff',
+        backgroundColor: '#F3F4F6', // Light gray background for the app
     },
     scrollContent: {
-        flexGrow: 1,
-        alignItems: 'center',
         paddingVertical: 20,
+        paddingHorizontal: 16,
+        alignItems: 'center',
     },
-    contentContainer: {
+    documentCard: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 16,
+        paddingVertical: 40,
+        paddingHorizontal: 30,
         width: '100%',
-        maxWidth: 800,
-        paddingHorizontal: 24,
+        maxWidth: 800, // Keeps it readable on web
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3, // Android shadow
     },
     header: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#000',
-        marginBottom: 8,
-        marginTop: 10,
+        alignItems: 'center',
+        marginBottom: 20,
     },
-    lastUpdated: {
-        fontSize: 14,
-        color: '#666',
+    logoRow: {
+        flexDirection: 'row',
+        alignItems: 'baseline',
+        marginBottom: 8,
+    },
+    logoText: {
+        fontSize: 32,
+        fontWeight: '900',
+        color: '#111827',
+        letterSpacing: -1,
+    },
+    logoDot: {
+        fontSize: 32,
+        fontWeight: '900',
+        color: '#F97316', // Kitos Orange
+    },
+    docTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#374151',
+        marginTop: 4,
+    },
+    badge: {
+        marginTop: 12,
+        backgroundColor: '#F3F4F6',
+        paddingVertical: 4,
+        paddingHorizontal: 12,
+        borderRadius: 100,
+    },
+    badgeText: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#6B7280',
+    },
+    divider: {
+        height: 1,
+        backgroundColor: '#E5E7EB',
+        width: '100%',
+        marginVertical: 30,
+    },
+    body: {
+        width: '100%',
+    },
+    section: {
         marginBottom: 32,
     },
     sectionHeader: {
-        fontSize: 22,
-        fontWeight: '700',
-        color: '#000',
-        marginTop: 24,
-        marginBottom: 12,
-    },
-    subHeader: {
         fontSize: 18,
-        fontWeight: '600',
-        color: '#333',
-        marginTop: 16,
-        marginBottom: 8,
+        fontWeight: '700',
+        color: '#1F2937', // Darker gray for headings
+        marginBottom: 12,
     },
     paragraph: {
         fontSize: 16,
-        lineHeight: 24,
-        color: '#333',
-        marginBottom: 12,
+        lineHeight: 26, // Good line height for readability
+        color: '#4B5563', // Softer gray for body text
     },
-    bulletPoint: {
+    highlight: {
+        fontWeight: '600',
+        color: '#111827',
+    },
+    bulletRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        marginBottom: 8,
-        paddingLeft: 8,
+        marginTop: 10,
     },
-    bullet: {
+    bulletDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#F97316', // Orange accent
+        marginTop: 10,
+        marginRight: 12,
+    },
+    bulletText: {
         fontSize: 16,
-        marginRight: 8,
-        color: '#333',
-        lineHeight: 24,
+        lineHeight: 26,
+        color: '#4B5563',
+        flex: 1,
     },
     link: {
-        color: '#f89219',
+        fontSize: 16,
         fontWeight: '600',
+        color: '#F97316',
+        marginTop: 5,
     },
-    footerSpacer: {
-        height: 60,
+    footer: {
+        marginTop: 40,
+        borderTopWidth: 1,
+        borderTopColor: '#F3F4F6',
+        paddingTop: 20,
+        alignItems: 'center',
+    },
+    footerText: {
+        fontSize: 14,
+        color: '#9CA3AF',
     },
 });
