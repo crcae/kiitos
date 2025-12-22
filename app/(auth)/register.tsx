@@ -11,12 +11,12 @@ import {
     Platform
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { useAuth } from '../src/context/AuthContext';
-import { createRestaurant, assignUserToRestaurant, createStaffMember } from '../src/services/saas';
-import { SubscriptionPlan } from '../src/types/firestore';
-import { simulateSuccessfulPayment } from '../src/services/stripe';
-import { validateInvitationCode, markCodeAsUsed } from '../src/services/invitationCodes';
-import { UserRole } from '../src/types/firestore';
+import { useAuth } from '../../src/context/AuthContext';
+import { createRestaurant, assignUserToRestaurant, createStaffMember } from '../../src/services/saas';
+import { SubscriptionPlan } from '../../src/types/firestore';
+import { simulateSuccessfulPayment } from '../../src/services/stripe';
+import { validateInvitationCode, markCodeAsUsed } from '../../src/services/invitationCodes';
+import { UserRole } from '../../src/types/firestore';
 
 type SignupMode = 'owner' | 'staff';
 
