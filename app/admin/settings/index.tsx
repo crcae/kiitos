@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Modal, Image, Platform, TextInput, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Save, Clock, MapPin, Palette, Globe, QrCode, Info, X, ExternalLink } from 'lucide-react-native';
+import { ArrowLeft, Clock, MapPin, Palette, Globe, QrCode, Info, X, ExternalLink } from 'lucide-react-native';
 
 import { useRouter } from 'expo-router';
 import AirbnbButton from '../../../src/components/AirbnbButton';
@@ -11,10 +11,11 @@ import { colors, spacing, typography } from '../../../src/styles/theme';
 import { useAuth } from '../../../src/context/AuthContext';
 import { useRestaurant } from '../../../src/hooks/useRestaurant';
 import { subscribeToRestaurantConfig, updateRestaurantConfig } from '../../../src/services/menu';
-import BrandingColorPicker from '../../../src/components/BrandingColorPicker';
 import { uploadImage } from '../../../src/services/storage';
 import * as ImagePicker from 'expo-image-picker';
 import QRCode from 'react-native-qrcode-svg';
+import ColorPicker, { HueSlider, Panel1 } from 'reanimated-color-picker';
+import useDebounce from '../../../src/hooks/useDebounce';
 
 const DAYS = [
     { key: 'mon', label: 'Lunes' },
@@ -50,8 +51,17 @@ export default function SettingsScreen() {
 
     // UI State
     const [uploading, setUploading] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [qrModalVisible, setQrModalVisible] = useState(false);
     const [brandingModalVisible, setBrandingModalVisible] = useState(false);
+
+    // Initial load tracking to prevent auto-saving on first mount
+    const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+    const debouncedBrandingColor = useDebounce(brandingColor, 1000);
+    const debouncedGooglePlaceId = useDebounce(googlePlaceId, 1500);
+    const debouncedRadioMeters = useDebounce(locationRestriction.radius_meters, 1500);
 
     useEffect(() => {
         if (!restaurantId) return;
@@ -85,29 +95,54 @@ export default function SettingsScreen() {
             if (config.location_restriction) {
                 setLocationRestriction(config.location_restriction);
             }
+            setIsInitialLoad(false);
         });
 
         return () => unsubscribeConfig();
     }, [restaurantId]);
 
-    const handleSaveGeneral = async () => {
-        if (!restaurantId) return;
+    // Auto-save function
+    const autoSave = async (updates: any) => {
+        if (!restaurantId || isInitialLoad) return;
         try {
-            await updateRestaurantConfig(restaurantId, {
-                allow_guest_ordering: allowGuestOrdering,
-                enable_takeout: enableTakeout,
-                opening_hours: openingHours,
-                google_place_id: googlePlaceId,
-                coordinates: coordinates || undefined,
-                location_name: locationName || undefined,
-                location_restriction: locationRestriction
-            });
-            Alert.alert('Éxito', 'Configuración guardada correctamente');
+            setIsSaving(true);
+            await updateRestaurantConfig(restaurantId, updates);
+            setLastSaved(new Date());
         } catch (e) {
-            console.error(e);
-            Alert.alert('Error', 'No se pudo guardar la configuración');
+            console.error('Auto-save error:', e);
+        } finally {
+            setIsSaving(false);
         }
     };
+
+    // Effect for debounced branding color
+    useEffect(() => {
+        if (!isInitialLoad) {
+            autoSave({
+                branding: {
+                    logo_url: brandingLogo || undefined,
+                    primary_color: debouncedBrandingColor,
+                }
+            });
+        }
+    }, [debouncedBrandingColor]);
+
+    // Effect for debounced Google Place ID
+    useEffect(() => {
+        if (!isInitialLoad) {
+            autoSave({ google_place_id: debouncedGooglePlaceId });
+        }
+    }, [debouncedGooglePlaceId]);
+
+    // Effect for debounced Radio Meters
+    useEffect(() => {
+        if (!isInitialLoad) {
+            autoSave({ location_restriction: { ...locationRestriction, radius_meters: debouncedRadioMeters } });
+        }
+    }, [debouncedRadioMeters]);
+
+    // Effect for debounced opening hours could be added if needed, 
+    // but usually these are changed one by one, so direct save is fine
 
     const pickImage = async () => {
         let result = await ImagePicker.launchImageLibraryAsync({
@@ -118,36 +153,35 @@ export default function SettingsScreen() {
         });
 
         if (!result.canceled) {
-            setBrandingLogo(result.assets[0].uri);
-        }
-    };
+            const localUri = result.assets[0].uri;
+            setBrandingLogo(localUri);
 
-    const handleSaveBranding = async () => {
-        if (!restaurantId) return;
-        try {
-            setUploading(true);
-            let logoUrl = brandingLogo;
-
-            if (brandingLogo && !brandingLogo.startsWith('http')) {
-                const filename = `branding/logo_${Date.now()}.jpg`;
-                logoUrl = await uploadImage(brandingLogo, `restaurants/${restaurantId}/${filename}`);
-            }
-
-            await updateRestaurantConfig(restaurantId, {
-                branding: {
-                    logo_url: logoUrl || undefined,
-                    primary_color: brandingColor,
+            // Immediate upload and save
+            if (restaurantId) {
+                try {
+                    setUploading(true);
+                    setIsSaving(true);
+                    const filename = `branding/logo_${Date.now()}.jpg`;
+                    const logoUrl = await uploadImage(localUri, `restaurants/${restaurantId}/${filename}`);
+                    await updateRestaurantConfig(restaurantId, {
+                        branding: {
+                            logo_url: logoUrl,
+                            primary_color: brandingColor,
+                        }
+                    });
+                    setBrandingLogo(logoUrl);
+                    setLastSaved(new Date());
+                } catch (e) {
+                    console.error('Logo upload error:', e);
+                    Alert.alert('Error', 'No se pudo subir el logo');
+                } finally {
+                    setUploading(false);
+                    setIsSaving(false);
                 }
-            });
-            setBrandingModalVisible(false);
-            Alert.alert('Éxito', 'Configuración de marca actualizada');
-        } catch (e: any) {
-            console.error(e);
-            Alert.alert('Error', 'No se pudo guardar la marca: ' + e.message);
-        } finally {
-            setUploading(false);
+            }
         }
     };
+
 
     const fetchCoordinates = async () => {
         if (!googlePlaceId) {
@@ -155,6 +189,7 @@ export default function SettingsScreen() {
             return;
         }
         setUploading(true);
+        setIsSaving(true);
         try {
             // Use local API proxy to avoid CORS
             const response = await fetch(`/api/places/details?place_id=${googlePlaceId}`);
@@ -165,6 +200,13 @@ export default function SettingsScreen() {
                 setCoordinates({ lat, lng });
                 const name = data.result.name;
                 setLocationName(name);
+
+                // Save coordinates immediately
+                await updateRestaurantConfig(restaurantId!, {
+                    coordinates: { lat, lng },
+                    location_name: name
+                });
+                setLastSaved(new Date());
                 Alert.alert('Éxito', `Ubicación confirmada:\n${name}`);
             } else {
                 console.error('Places API Error:', data);
@@ -175,17 +217,20 @@ export default function SettingsScreen() {
             console.error(error);
         } finally {
             setUploading(false);
+            setIsSaving(false);
         }
     };
 
     const updateDayHours = (day: string, field: string, value: any) => {
-        setOpeningHours({
+        const newHours = {
             ...openingHours,
             [day]: {
                 ...openingHours[day],
                 [field]: value
             }
-        });
+        };
+        setOpeningHours(newHours);
+        autoSave({ opening_hours: newHours });
     };
 
     return (
@@ -198,16 +243,22 @@ export default function SettingsScreen() {
                     </TouchableOpacity>
                     <View>
                         <Text className="text-xl font-bold text-white">Configuración</Text>
-                        <Text className="text-slate-400 text-xs">{restaurant?.name || 'Cargando...'}</Text>
+                        <View className="flex-row items-center">
+                            <Text className="text-slate-400 text-xs mr-2">{restaurant?.name || 'Cargando...'}</Text>
+                            {isSaving ? (
+                                <View className="flex-row items-center">
+                                    <View className="w-1 h-1 rounded-full bg-indigo-400 mr-1" />
+                                    <Text className="text-indigo-400 text-[10px] font-medium uppercase tracking-tighter">Guardando...</Text>
+                                </View>
+                            ) : lastSaved ? (
+                                <View className="flex-row items-center">
+                                    <View className="w-1 h-1 rounded-full bg-emerald-400 mr-1" />
+                                    <Text className="text-emerald-400 text-[10px] uppercase tracking-tighter">Sincronizado</Text>
+                                </View>
+                            ) : null}
+                        </View>
                     </View>
                 </View>
-                <TouchableOpacity
-                    onPress={handleSaveGeneral}
-                    className="bg-indigo-600 px-4 py-2 rounded-lg flex-row items-center"
-                >
-                    <Save size={18} color="white" className="mr-2" />
-                    <Text className="text-white font-bold">Guardar</Text>
-                </TouchableOpacity>
             </View>
 
             <ScrollView className="flex-1 px-6 py-4">
@@ -218,29 +269,107 @@ export default function SettingsScreen() {
                         <Text className="text-lg font-bold text-white">General</Text>
                     </View>
                     <AirbnbCard variant="dark">
-                        <View className="flex-row items-center justify-between py-2 border-b border-slate-700">
-                            <View>
-                                <Text className="text-white font-medium">Pedidos de Clientes</Text>
-                                <Text className="text-slate-400 text-xs">Permitir que los clientes pidan desde su mesa</Text>
+                        <View className="py-2 border-b border-slate-700">
+                            <View className="flex-row items-center justify-between">
+                                <View>
+                                    <Text className="text-white font-medium">Pedidos de Clientes</Text>
+                                    <Text className="text-slate-400 text-xs">Permitir que los clientes pidan desde su mesa</Text>
+                                </View>
+                                <Switch
+                                    trackColor={{ false: "#334155", true: "#059669" }}
+                                    thumbColor={allowGuestOrdering ? "#ffffff" : "#cbd5e1"}
+                                    onValueChange={(val) => {
+                                        setAllowGuestOrdering(val);
+                                        autoSave({ allow_guest_ordering: val });
+                                    }}
+                                    value={allowGuestOrdering}
+                                />
                             </View>
-                            <Switch
-                                trackColor={{ false: "#334155", true: "#059669" }}
-                                thumbColor={allowGuestOrdering ? "#ffffff" : "#cbd5e1"}
-                                onValueChange={setAllowGuestOrdering}
-                                value={allowGuestOrdering}
-                            />
+
+                            {/* Move Radio Restriction here */}
+                            {allowGuestOrdering && (
+                                <View className="mt-4 pt-4 border-t border-slate-700/50">
+                                    <View className="flex-row items-center justify-between mb-4">
+                                        <View>
+                                            <Text className="text-white font-medium">Restricción de Radio</Text>
+                                            <Text className="text-slate-400 text-xs">Limitar pedidos a una distancia especifica</Text>
+                                        </View>
+                                        <Switch
+                                            trackColor={{ false: "#334155", true: "#059669" }}
+                                            thumbColor={locationRestriction.enabled ? "#ffffff" : "#cbd5e1"}
+                                            onValueChange={(val) => {
+                                                const newRest = { ...locationRestriction, enabled: val };
+                                                setLocationRestriction(newRest);
+                                                autoSave({ location_restriction: newRest });
+                                            }}
+                                            value={locationRestriction.enabled}
+                                        />
+                                    </View>
+
+                                    {locationRestriction.enabled && (
+                                        <View>
+                                            <View className="flex-row justify-between mb-2">
+                                                <Text className="text-slate-300 text-sm">Radio Máximo (metros)</Text>
+                                                <Text className="text-indigo-400 text-sm font-bold">{locationRestriction.radius_meters}m</Text>
+                                            </View>
+                                            <TextInput
+                                                className="bg-slate-800 text-white px-4 py-3 rounded-xl border border-slate-700 font-bold text-lg"
+                                                keyboardType="numeric"
+                                                value={String(locationRestriction.radius_meters)}
+                                                onChangeText={(t) => {
+                                                    const val = parseInt(t) || 0;
+                                                    setLocationRestriction(prev => ({ ...prev, radius_meters: val }));
+                                                }}
+                                                placeholder="1000"
+                                            />
+                                        </View>
+                                    )}
+                                </View>
+                            )}
                         </View>
-                        <View className="flex-row items-center justify-between py-2">
-                            <View>
-                                <Text className="text-white font-medium">Módulo Takeout</Text>
-                                <Text className="text-slate-400 text-xs">Habilitar pedidos para llevar</Text>
+                        <View className="py-2">
+                            <View className="flex-row items-center justify-between">
+                                <View>
+                                    <Text className="text-white font-medium">Módulo Takeout</Text>
+                                    <Text className="text-slate-400 text-xs">Habilitar pedidos para llevar</Text>
+                                </View>
+                                <Switch
+                                    trackColor={{ false: "#334155", true: "#ea580c" }}
+                                    thumbColor={enableTakeout ? "#ffffff" : "#cbd5e1"}
+                                    onValueChange={(val) => {
+                                        setEnableTakeout(val);
+                                        autoSave({ enable_takeout: val });
+                                    }}
+                                    value={enableTakeout}
+                                />
                             </View>
-                            <Switch
-                                trackColor={{ false: "#334155", true: "#ea580c" }}
-                                thumbColor={enableTakeout ? "#ffffff" : "#cbd5e1"}
-                                onValueChange={setEnableTakeout}
-                                value={enableTakeout}
-                            />
+
+                            {/* Takeout QR Section Moved Here */}
+                            {enableTakeout && (
+                                <View className="mt-4 pt-4 border-t border-slate-700/50">
+                                    <View className="flex-row items-center mb-4">
+                                        <QrCode size={18} color="#ea580c" className="mr-2" />
+                                        <Text className="text-sm font-bold text-white">QR Takeout</Text>
+                                    </View>
+                                    <View className="items-center bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                                        <View className="bg-white p-3 rounded-xl mb-4">
+                                            <QRCode
+                                                value={`${Platform.OS === 'web' ? window.location.origin : 'https://kiitos-app.web.app'}/takeout/${restaurantId}`}
+                                                size={120}
+                                            />
+                                        </View>
+                                        <Text className="text-slate-400 text-center text-xs mb-4 px-4">
+                                            Este código dirige a los clientes a tu menú para llevar.
+                                        </Text>
+                                        <TouchableOpacity
+                                            onPress={() => setQrModalVisible(true)}
+                                            className="bg-indigo-600/20 px-4 py-2 rounded-lg border border-indigo-500/30"
+                                        >
+                                            <Text className="text-indigo-400 font-bold text-xs italic">Ver pantalla completa</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                </View>
+                            )}
                         </View>
                     </AirbnbCard>
                 </View>
@@ -252,23 +381,57 @@ export default function SettingsScreen() {
                         <Text className="text-lg font-bold text-white">Marca</Text>
                     </View>
                     <AirbnbCard variant="dark">
-                        <View className="flex-row items-center justify-between">
-                            <View className="flex-row items-center">
+                        <View className="flex-row items-center mb-6">
+                            <TouchableOpacity
+                                onPress={pickImage}
+                                className="w-20 h-20 bg-slate-800 rounded-full border border-slate-700 items-center justify-center overflow-hidden mr-4"
+                            >
+                                {brandingLogo ? (
+                                    <Image source={{ uri: brandingLogo }} className="w-full h-full" resizeMode="cover" />
+                                ) : (
+                                    <Palette size={24} color="#94a3b8" />
+                                )}
+                                <View className="absolute bottom-0 left-0 right-0 bg-black/50 py-1">
+                                    <Text className="text-[8px] text-white text-center font-bold">CAMBIAR</Text>
+                                </View>
+                            </TouchableOpacity>
+                            <View className="flex-1">
+                                <Text className="text-white font-medium mb-1">Logo del Restaurante</Text>
+                                <Text className="text-slate-400 text-xs">Aparecerá en el menú y tickets</Text>
+                            </View>
+                        </View>
+
+                        <View className="pt-4 border-t border-slate-800">
+                            <Text className="text-white font-medium mb-3">Color Principal</Text>
+                            <View className="flex-row items-center mb-4">
                                 <View
                                     style={{ backgroundColor: brandingColor }}
-                                    className="w-10 h-10 rounded-full mr-4 border border-slate-600"
+                                    className="w-10 h-10 rounded-lg mr-3 border border-slate-700 shadow-sm"
                                 />
-                                <View>
-                                    <Text className="text-white font-medium">Identidad Visual</Text>
-                                    <Text className="text-slate-400 text-xs">Logo y color principal</Text>
+                                <View className="flex-1">
+                                    <TextInput
+                                        className="bg-slate-800 text-white px-3 py-2 rounded-lg border border-slate-700 font-mono text-sm"
+                                        value={brandingColor}
+                                        onChangeText={setBrandingColor}
+                                        placeholder="#000000"
+                                        autoCapitalize="characters"
+                                        maxLength={7}
+                                    />
                                 </View>
                             </View>
-                            <TouchableOpacity
-                                onPress={() => setBrandingModalVisible(true)}
-                                className="bg-slate-800 px-4 py-2 rounded-lg border border-slate-700"
+
+                            <ColorPicker
+                                style={{ width: '100%' }}
+                                value={brandingColor}
+                                onComplete={({ hex }) => setBrandingColor(hex)}
                             >
-                                <Text className="text-slate-300 font-bold">Editar</Text>
-                            </TouchableOpacity>
+                                <Panel1 style={{ height: 160, borderRadius: 12, marginBottom: 16 }} />
+                                <HueSlider style={{ height: 30, borderRadius: 15, marginBottom: 16 }} />
+                            </ColorPicker>
+
+                            <Text className="text-slate-500 text-[10px] mt-3 italic">
+                                Desliza para cambiar el tono o escribe el código HEX manualmente.
+                            </Text>
                         </View>
                     </AirbnbCard>
                 </View>
@@ -369,73 +532,9 @@ export default function SettingsScreen() {
                             </View>
                         )}
 
-                        <View className="border-t border-slate-700 pt-4">
-                            <View className="flex-row items-center justify-between mb-4">
-                                <View>
-                                    <Text className="text-white font-medium">Restricción de Radio</Text>
-                                    <Text className="text-slate-400 text-xs">Limitar pedidos a una distancia especifica</Text>
-                                </View>
-                                <Switch
-                                    trackColor={{ false: "#334155", true: "#059669" }}
-                                    thumbColor={locationRestriction.enabled ? "#ffffff" : "#cbd5e1"}
-                                    onValueChange={(val) => setLocationRestriction(prev => ({ ...prev, enabled: val }))}
-                                    value={locationRestriction.enabled}
-                                />
-                            </View>
-
-                            {locationRestriction.enabled && (
-                                <View>
-                                    <View className="flex-row justify-between mb-2">
-                                        <Text className="text-slate-300 text-sm">Radio Máximo</Text>
-                                        <Text className="text-indigo-400 text-sm font-bold">{locationRestriction.radius_meters} metros</Text>
-                                    </View>
-                                    <TextInput
-                                        className="bg-slate-800 text-white px-4 py-3 rounded-xl border border-slate-700 font-bold text-lg"
-                                        keyboardType="numeric"
-                                        value={String(locationRestriction.radius_meters)}
-                                        onChangeText={(t) => {
-                                            const val = parseInt(t) || 0;
-                                            setLocationRestriction(prev => ({ ...prev, radius_meters: val }));
-                                        }}
-                                        placeholder="1000"
-                                    />
-                                    <Text className="text-slate-500 text-xs mt-2">
-                                        Los clientes fuera de este radio no podrán enviar pedidos a la cocina.
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
                     </AirbnbCard>
                 </View>
 
-                {/* Takeout QR Section */}
-                {enableTakeout && (
-                    <View className="mb-12">
-                        <View className="flex-row items-center mb-4">
-                            <QrCode size={20} color="#6366f1" className="mr-2" />
-                            <Text className="text-lg font-bold text-white">QR Takeout</Text>
-                        </View>
-                        <AirbnbCard variant="dark">
-                            <View className="items-center py-4">
-                                <View className="bg-white p-4 rounded-xl mb-4">
-                                    <QRCode
-                                        value={`https://kiitos.app/takeout/${restaurantId}`}
-                                        size={150}
-                                    />
-                                </View>
-                                <Text className="text-slate-400 text-center text-sm mb-4">
-                                    Este código dirige a los clientes a tu menú de pedidos para llevar.
-                                </Text>
-                                <TouchableOpacity
-                                    onPress={() => setQrModalVisible(true)}
-                                    className="bg-indigo-600 px-6 py-2 rounded-full"
-                                >
-                                    <Text className="text-white font-bold">Ver Pantalla Completa</Text>
-                                </TouchableOpacity>
-                            </View>
-                        </AirbnbCard>
-                    </View>
-                )}
                 {/* Place ID Info Modal */}
                 <Modal
                     visible={showPlaceIdInfo}
@@ -484,50 +583,6 @@ export default function SettingsScreen() {
                 </Modal>
             </ScrollView>
 
-            {/* Branding Modal */}
-            <Modal visible={brandingModalVisible} transparent animationType="slide">
-                <View className="flex-1 justify-end bg-black/60">
-                    <View className="bg-slate-900 rounded-t-3xl p-6 border-t border-slate-800">
-                        <View className="flex-row justify-between items-center mb-6">
-                            <Text className="text-xl font-bold text-white">Personalizar Marca</Text>
-                            <TouchableOpacity onPress={() => setBrandingModalVisible(false)}>
-                                <Text className="text-slate-400 font-bold">Cerrar</Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        <Text className="text-slate-300 font-bold mb-2">Logo del Restaurante</Text>
-                        <TouchableOpacity
-                            onPress={pickImage}
-                            className="w-full h-40 bg-slate-800 rounded-xl border-2 border-dashed border-slate-700 items-center justify-center mb-6 overflow-hidden"
-                        >
-                            {brandingLogo ? (
-                                <Image source={{ uri: brandingLogo }} className="w-full h-full" resizeMode="contain" />
-                            ) : (
-                                <View className="items-center">
-                                    <Palette size={32} color="#94a3b8" />
-                                    <Text className="text-slate-500 mt-2">Seleccionar Logo</Text>
-                                </View>
-                            )}
-                        </TouchableOpacity>
-
-                        <Text className="text-slate-300 font-bold mb-4">Color Principal</Text>
-                        <BrandingColorPicker
-                            value={brandingColor}
-                            onComplete={setBrandingColor}
-                        />
-
-                        <TouchableOpacity
-                            onPress={handleSaveBranding}
-                            disabled={uploading}
-                            className="bg-indigo-600 w-full py-4 rounded-xl mt-8 items-center"
-                        >
-                            <Text className="text-white font-bold text-lg">
-                                {uploading ? 'Guardando...' : 'Guardar Cambios'}
-                            </Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
 
             {/* QR Fullscreen Modal */}
             <Modal visible={qrModalVisible} transparent animationType="fade">
@@ -538,7 +593,7 @@ export default function SettingsScreen() {
 
                         <View className="bg-white p-2 rounded-xl mb-8">
                             <QRCode
-                                value={`https://kiitos.app/takeout/${restaurantId}`}
+                                value={`${Platform.OS === 'web' ? window.location.origin : 'https://kiitos-app.web.app'}/takeout/${restaurantId}`}
                                 size={250}
                             />
                         </View>
