@@ -15,12 +15,30 @@ import { useTenant } from '../../src/context/TenantContext';
 
 export default function LoginPage() {
     const router = useRouter();
-    const { signIn } = useAuth();
+    const { signIn, user, loading: authLoading } = useAuth(); // Get user and authLoading
     const { restaurant } = useTenant();
 
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
+
+    // Manual Redirection Effect (Failsafe)
+    React.useEffect(() => {
+        if (user && !authLoading) {
+            console.log('🔄 Login Page Redirecting user:', user.role);
+            if (user.role === 'saas_admin' || user.role === 'restaurant_owner' || user.role === 'restaurant_manager') {
+                router.replace('/admin');
+            } else if (user.role === 'waiter') {
+                router.replace('/waiter');
+            } else if (user.role === 'cashier') {
+                router.replace('/cashier');
+            } else if (user.role === 'kitchen') {
+                router.replace('/kitchen');
+            } else if (user.role === 'customer') {
+                router.replace('/(app)/marketplace');
+            }
+        }
+    }, [user, authLoading]);
 
     const handleLogin = async () => {
         if (!email || !password) {
@@ -32,14 +50,8 @@ export default function LoginPage() {
             setLoading(true);
             console.log('🔐 Attempting login...');
             await signIn(email, password);
-
-            // The redirection logic is handled by RouteGuard and index.tsx
-            // But we can also do a manual redirect here for better UX
             console.log('✅ Login successful!');
-
-            // We'll let the RouteGuard handle the redirect based on the new user state
-            // which will update shortly after login
-
+            // Loading stays true until redirect happens or component unmounts
         } catch (error: any) {
             console.error('Login error:', error);
             Alert.alert(

@@ -79,17 +79,23 @@ function RootRouteGuard() {
 
         const path = segments.join('/');
 
-        // console.log(`Guard Check: User=${!!user}, Path=${path}, OnboardingComplete=${user?.onboardingComplete}`);
-
         if (user) {
             // User is logged in
             const isRestaurantOwner = user.role === 'restaurant_owner';
+            const isCustomer = user.role === 'customer';
+
+            // --- RBAC CHECK ---
+            if (isCustomer) {
+                // Customers CANNOT access: Admin, Waiter, Cashier, Kitchen, Onboarding
+                if (inAdmin || inWaiter || inCashier || inKitchen || inOnboarding) {
+                    router.replace('/(app)/marketplace');
+                    return;
+                }
+            }
 
             if (isRestaurantOwner && !user.onboardingComplete) {
                 // Must be in onboarding
                 if (!inOnboarding) {
-                    // Check if we are already trying to go there to avoid loop?
-                    // Verify if route exists? For now assume YES as we defined it in Stack.
                     router.replace('/onboarding');
                 }
             } else if (isRestaurantOwner && user.onboardingComplete) {
@@ -97,27 +103,31 @@ function RootRouteGuard() {
                 if (inOnboarding) {
                     router.replace('/admin');
                 }
-                // If at root or login, go to admin
-                if (path === '' || path === 'login' || path === 'login/staff') {
+                // Only redirect from login pages, NOT from root (allow landing page)
+                if (path === 'login' || path === 'login/staff') {
                     router.replace('/admin');
                 }
             } else {
-                // Staff Roles (Waiter, Cashier, Kitchen)
+                // Staff Roles (Waiter, Cashier, Kitchen) & Customer (if valid route)
 
                 // 1. Protect Admin Routes: Staff cannot go to /admin
                 if (inAdmin) {
+                    // Redirect staff to their operational dashboard
                     if (user.role === 'waiter') router.replace('/waiter');
                     else if (user.role === 'cashier') router.replace('/cashier');
                     else if (user.role === 'kitchen') router.replace('/kitchen');
+                    // Customer was handled above
                     return;
                 }
 
-                // 2. Redirect from Login/Root to specific dashboard
-                if (path === '' || path === 'login' || path === 'login/staff') {
-                    if (user.role === 'admin') router.replace('/admin');
+                // 2. Redirect from Login to specific dashboard (ONLY if on login page)
+                // Fix: account for (auth) group in path
+                if (path === 'login' || path === '(auth)/login' || path === 'login/staff') {
+                    if (user.role === 'saas_admin') router.replace('/admin');
                     else if (user.role === 'waiter') router.replace('/waiter');
                     else if (user.role === 'cashier') router.replace('/cashier');
                     else if (user.role === 'kitchen') router.replace('/kitchen');
+                    else if (user.role === 'customer') router.replace('/(app)/marketplace');
                 }
             }
         } else {
