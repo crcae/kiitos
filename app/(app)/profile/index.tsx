@@ -1,124 +1,195 @@
-import React from 'react';
-import { View, Text, ScrollView, TouchableOpacity, Image, Switch } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Platform, Alert, ActivityIndicator, TextInput, KeyboardAvoidingView } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Clock, CreditCard, ChevronRight, LogOut, Plus, Receipt, User, Smartphone, Wallet } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { CreditCard, Clock, Receipt, Bell, Moon, CircleHelp, ChevronRight, LogOut, Wallet } from 'lucide-react-native';
+import { StatusBar } from 'expo-status-bar';
+import { useAuth } from '../../../src/context/AuthContext';
+import { auth, db } from '../../../src/services/firebaseConfig';
+import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
+import { FloatingTabMenu } from '../../../src/components/navigation/FloatingTabMenu';
+import CustomerPhoneAuth from '../../../src/components/auth/CustomerPhoneAuth';
 
 export default function ProfileScreen() {
     const router = useRouter();
+    const authContext = useAuth();
+    const { user, firebaseUser, signOut, loading, refreshUser } = authContext;
+
+    console.log('[ProfileScreen] Render State:', {
+        hasUser: !!user,
+        hasFirebaseUser: !!firebaseUser,
+        loading,
+        hasSignOut: typeof signOut === 'function'
+    });
+
+    useEffect(() => {
+        console.log('[ProfileScreen] Mounted');
+        return () => console.log('[ProfileScreen] Unmounted');
+    }, []);
+
+    useEffect(() => {
+        console.log('[ProfileScreen] Auth State Changed:', { hasUser: !!user, loading });
+    }, [user, loading]);
+
+    if (loading) {
+        return (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                <ActivityIndicator size="large" color="#F97316" />
+            </View>
+        );
+    }
+
+    // Fallback if no user is loaded yet (Guest Mode)
+    if (!user) {
+        return <GuestView router={router} refreshUser={refreshUser} />;
+    }
+
+    const handleLogout = async () => {
+        console.log('[ProfileScreen] handleLogout initiated');
+        try {
+            await signOut();
+            console.log('[ProfileScreen] SignOut successful');
+            // We stay on /profile, the GuestView will render automatically because user is now null
+        } catch (error) {
+            console.error('[ProfileScreen] SignOut error:', error);
+            Alert.alert("Logout Error", "Failed to sign out. Please try again.");
+        }
+    };
 
     return (
-        <View className="flex-1 bg-stone-50">
-            <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 120 }}>
-                {/* Header */}
-                <View className="bg-white pt-20 pb-8 px-6 items-center shadow-sm rounded-b-3xl mb-6">
-                    <View className="w-24 h-24 bg-stone-200 rounded-full mb-4 shadow-inner overflow-hidden">
+        <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+            <SafeAreaView style={styles.container} edges={['top']}>
+                <StatusBar style="dark" />
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+                    {/* DYNAMIC HEADER */}
+                    <View style={styles.header}>
                         <Image
-                            source={{ uri: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200&q=80' }}
-                            className="w-full h-full"
-                            style={{ resizeMode: 'cover' }}
+                            source={{ uri: user.avatar || (firebaseUser as any)?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || user.email || 'User')}&background=F97316&color=fff` }}
+                            style={styles.avatar}
                         />
+                        <Text style={styles.name}>{user.name || (firebaseUser as any)?.displayName || "Valued Customer"}</Text>
+                        <Text style={styles.email}>{user.email}</Text>
                     </View>
-                    <Text className="text-2xl font-bold text-stone-900">Alex Johnson</Text>
-                    <Text className="text-stone-500 font-medium">Member since 2025</Text>
-                </View>
 
-                {/* Section 1: Wallet */}
-                <View className="px-4 mb-6">
-                    <Text className="text-lg font-bold text-stone-900 mb-3 ml-2">My Wallet</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pl-1">
-                        {/* Saved Card */}
-                        <TouchableOpacity className="bg-stone-900 w-72 h-44 rounded-2xl p-6 mr-4 justify-between shadow-md">
-                            <View className="flex-row justify-between items-start">
-                                <CreditCard color="white" size={24} />
-                                <Text className="text-white font-bold text-lg italic">VISA</Text>
+                    {/* WALLET SECTION (Empty State + Apple/Google Pay) */}
+                    <View style={styles.sectionHeader}>
+                        <Text style={styles.sectionTitle}>Payment Methods</Text>
+                    </View>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.walletScroll} contentContainerStyle={{ paddingHorizontal: 20 }}>
+                        {/* Add New Method (Primary) */}
+                        <TouchableOpacity style={styles.addCardBtn} onPress={() => router.push('/profile/add-card')}>
+                            <View style={styles.plusIcon}>
+                                <Plus size={24} color="#9CA3AF" />
                             </View>
-                            <View>
-                                <Text className="text-stone-400 text-sm mb-1">Card Number</Text>
-                                <Text className="text-white font-mono text-xl tracking-widest">•••• 4242</Text>
-                            </View>
-                            <View className="flex-row justify-between">
-                                <Text className="text-stone-400 text-xs">Holder name</Text>
-                                <Text className="text-stone-400 text-xs">Expires</Text>
-                            </View>
-                            <View className="flex-row justify-between">
-                                <Text className="text-white font-medium">ALEX JOHNSON</Text>
-                                <Text className="text-white font-medium">12/28</Text>
-                            </View>
+                            <Text style={styles.addText}>Add Card</Text>
                         </TouchableOpacity>
 
-                        {/* Add New Card */}
-                        <TouchableOpacity className="bg-white w-20 h-44 rounded-2xl items-center justify-center border-2 border-dashed border-stone-300 mr-4">
-                            <View className="w-10 h-10 rounded-full bg-stone-100 items-center justify-center mb-2">
-                                <Text className="text-stone-400 text-2xl">+</Text>
+                        {/* Apple/Google Pay Info Card */}
+                        <View style={styles.payInfoCard}>
+                            <View style={styles.payIconsRow}>
+                                {Platform.OS === 'ios' ? (
+                                    <Text style={styles.payTextBrand}> Pay</Text>
+                                ) : (
+                                    <Text style={styles.payTextBrand}>G Pay</Text>
+                                )}
                             </View>
-                            <Text className="text-stone-500 text-xs font-bold text-center px-1">Add Method</Text>
-                        </TouchableOpacity>
+                            <Text style={styles.payInfoText}>Fast & Secure checkout available</Text>
+                        </View>
                     </ScrollView>
-                </View>
 
-                {/* Section 2: Activity */}
-                <View className="px-4 mb-6">
-                    <Text className="text-lg font-bold text-stone-900 mb-3 ml-2">Activity</Text>
-                    <View className="bg-white rounded-2xl overflow-hidden shadow-sm">
-                        <TouchableOpacity className="flex-row items-center p-4 border-b border-stone-100">
-                            <View className="w-10 h-10 rounded-full bg-orange-100 items-center justify-center mr-3">
-                                <Clock size={20} color="#ea580c" />
-                            </View>
-                            <View className="flex-1">
-                                <Text className="text-stone-900 font-bold">Order History</Text>
-                                <Text className="text-stone-500 text-xs">View past meals</Text>
-                            </View>
-                            <ChevronRight size={20} color="#d6d3d1" />
-                        </TouchableOpacity>
-                        <TouchableOpacity className="flex-row items-center p-4">
-                            <View className="w-10 h-10 rounded-full bg-blue-100 items-center justify-center mr-3">
-                                <Receipt size={20} color="#2563eb" />
-                            </View>
-                            <View className="flex-1">
-                                <Text className="text-stone-900 font-bold">Transactions</Text>
-                                <Text className="text-stone-500 text-xs">Receipts & Invoices</Text>
-                            </View>
-                            <ChevronRight size={20} color="#d6d3d1" />
-                        </TouchableOpacity>
-                    </View>
-                </View>
+                    {/* UNIFIED MENU */}
+                    <View style={styles.sectionContainer}>
+                        <Text style={styles.sectionTitleInline}>Account & History</Text>
+                        <View style={styles.menuGroup}>
 
-                {/* Section 3: Preferences */}
-                <View className="px-4 mb-8">
-                    <Text className="text-lg font-bold text-stone-900 mb-3 ml-2">Preferences</Text>
-                    <View className="bg-white rounded-2xl overflow-hidden shadow-sm">
-                        <View className="flex-row items-center justify-between p-4 border-b border-stone-100">
-                            <View className="flex-row items-center">
-                                <Bell size={20} color="#57534e" className="mr-3" />
-                                <Text className="text-stone-900 font-medium">Notifications</Text>
-                            </View>
-                            <Switch value={true} trackColor={{ false: '#e7e5e4', true: '#ea580c' }} />
+                            <MenuItem
+                                icon={<Clock size={20} color="#F97316" />}
+                                label="Orders & Payments"
+                                sub="View empty history"
+                                onPress={() => router.push('/profile/activity')}
+                                bg="#FFF7ED"
+                            />
+
+                            <View style={styles.divider} />
+
+                            <MenuItem
+                                icon={<User size={20} color="#3B82F6" />}
+                                label="Personal Details"
+                                sub="Edit Profile, Name, Phone"
+                                onPress={() => router.push('/profile/account')}
+                                bg="#EFF6FF"
+                            />
+
                         </View>
-                        <View className="flex-row items-center justify-between p-4 border-b border-stone-100">
-                            <View className="flex-row items-center">
-                                <Moon size={20} color="#57534e" className="mr-3" />
-                                <Text className="text-stone-900 font-medium">Dark Mode</Text>
-                            </View>
-                            <Switch value={false} trackColor={{ false: '#e7e5e4', true: '#ea580c' }} />
-                        </View>
-                        <TouchableOpacity className="flex-row items-center p-4">
-                            <View className="flex-row items-center flex-1">
-                                <CircleHelp size={20} color="#57534e" className="mr-3" />
-                                <Text className="text-stone-900 font-medium">Help & Support</Text>
-                            </View>
-                            <ChevronRight size={20} color="#d6d3d1" />
-                        </TouchableOpacity>
                     </View>
-                </View>
 
-                {/* Logout */}
-                <TouchableOpacity className="mx-4 mb-8 bg-red-50 p-4 rounded-xl flex-row justify-center items-center">
-                    <LogOut size={20} color="#dc2626" className="mr-2" />
-                    <Text className="text-red-600 font-bold">Sign Out</Text>
-                </TouchableOpacity>
+                    <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+                        <LogOut size={20} color="#EF4444" />
+                        <Text style={styles.logoutText}>Log Out</Text>
+                    </TouchableOpacity>
 
-            </ScrollView>
+                    <View style={{ height: 120 }} />
+                </ScrollView>
+            </SafeAreaView>
 
+            <FloatingTabMenu activeTab="profile" />
         </View>
     );
 }
+
+const MenuItem = ({ icon, label, sub, onPress, bg }: any) => (
+    <TouchableOpacity style={styles.menuItem} onPress={onPress}>
+        <View style={[styles.iconBox, { backgroundColor: bg }]}>
+            {icon}
+        </View>
+        <View style={styles.menuContent}>
+            <Text style={styles.menuText}>{label}</Text>
+            {sub && <Text style={styles.menuSub}>{sub}</Text>}
+        </View>
+        <ChevronRight size={20} color="#D1D5DB" />
+    </TouchableOpacity>
+);
+
+const GuestView = ({ router, refreshUser }: any) => {
+    return (
+        <View style={{ flex: 1, backgroundColor: '#fff' }}>
+            <SafeAreaView style={styles.container}>
+                <StatusBar style="dark" />
+                <CustomerPhoneAuth onSuccess={() => { }} />
+            </SafeAreaView>
+            <FloatingTabMenu activeTab="profile" />
+        </View>
+    );
+};
+
+const styles = StyleSheet.create({
+    container: { flex: 1, backgroundColor: '#F9FAFB' },
+    scrollContent: { paddingTop: 20, paddingBottom: 40 },
+    header: { alignItems: 'center', marginBottom: 25 },
+    avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 15, borderWidth: 4, borderColor: '#fff' },
+    name: { fontSize: 24, fontWeight: '800', color: '#111', letterSpacing: -0.5 },
+    email: { fontSize: 14, color: '#6B7280', marginTop: 4, fontWeight: '500' },
+    sectionHeader: { paddingHorizontal: 20, marginBottom: 15 },
+    sectionTitle: { fontSize: 20, fontWeight: '700', color: '#111' },
+    sectionTitleInline: { fontSize: 18, fontWeight: '700', color: '#374151', marginBottom: 12, marginLeft: 5 },
+    walletScroll: { marginBottom: 30, flexGrow: 0 },
+    addCardBtn: { width: 140, height: 100, borderRadius: 20, borderWidth: 2, borderColor: '#E5E7EB', borderStyle: 'dashed', justifyContent: 'center', alignItems: 'center', backgroundColor: '#fff', marginRight: 15 },
+    plusIcon: { marginBottom: 8 },
+    addText: { fontSize: 14, color: '#6B7280', fontWeight: '600' },
+    payInfoCard: { width: 160, height: 100, borderRadius: 20, backgroundColor: '#111', padding: 15, justifyContent: 'center', marginRight: 20 },
+    payIconsRow: { marginBottom: 5 },
+    payTextBrand: { color: '#fff', fontWeight: 'bold', fontSize: 18 },
+    payInfoText: { color: '#9CA3AF', fontSize: 12 },
+    sectionContainer: { paddingHorizontal: 20, marginBottom: 25 },
+    menuGroup: { backgroundColor: '#fff', borderRadius: 24, padding: 6 },
+    menuItem: { flexDirection: 'row', alignItems: 'center', padding: 16 },
+    iconBox: { width: 42, height: 42, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
+    menuContent: { flex: 1 },
+    menuText: { fontSize: 16, fontWeight: '600', color: '#1F2937' },
+    menuSub: { fontSize: 13, color: '#9CA3AF', marginTop: 2 },
+    divider: { height: 1, backgroundColor: '#F3F4F6', marginLeft: 74 },
+    logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 20, opacity: 0.8 },
+    logoutText: { color: '#EF4444', fontWeight: '600', fontSize: 16, marginLeft: 10 },
+});
