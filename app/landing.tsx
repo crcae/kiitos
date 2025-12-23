@@ -1,11 +1,41 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Image, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import { CreditCard, Smartphone, Zap, Clock, TrendingUp, Shield, Menu, X, ArrowRight, CheckCircle, SmartphoneNfc } from 'lucide-react-native';
+import { useAuth } from '../src/context/AuthContext';
 
 export default function LandingPage() {
     const router = useRouter();
-    const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+    const { user } = useAuth(); // Access auth state
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+    const handleDashboardNavigation = () => {
+        if (!user) {
+            router.push('/login');
+            return;
+        }
+
+        switch (user.role) {
+            case 'saas_admin':
+            case 'restaurant_owner':
+            case 'restaurant_manager':
+                router.push('/admin');
+                break;
+            case 'waiter':
+                router.push('/waiter');
+                break;
+            case 'cashier':
+                router.push('/cashier');
+                break;
+            case 'kitchen':
+                router.push('/kitchen');
+                break;
+            case 'customer':
+            default:
+                router.push('/(app)/marketplace');
+                break;
+        }
+    };
 
     return (
         <ScrollView className="flex-1 bg-white">
@@ -19,9 +49,20 @@ export default function LandingPage() {
                         <TouchableOpacity onPress={() => router.push('/pricing')}>
                             <Text className="text-sm font-medium text-gray-600 hover:text-kiitos-orange transition-colors">For Restaurants</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity onPress={() => router.push('/login' as any)}>
-                            <Text className="text-sm font-medium text-gray-600 hover:text-kiitos-orange transition-colors">Login</Text>
-                        </TouchableOpacity>
+
+                        {/* Dynamic Button: Login vs Dashboard */}
+                        {user ? (
+                            <TouchableOpacity onPress={handleDashboardNavigation}>
+                                <Text className="text-sm font-medium text-kiitos-orange hover:text-orange-700 transition-colors">
+                                    Go to Dashboard ({user.name?.split(' ')[0]})
+                                </Text>
+                            </TouchableOpacity>
+                        ) : (
+                            <TouchableOpacity onPress={() => router.push('/login')}>
+                                <Text className="text-sm font-medium text-gray-600 hover:text-kiitos-orange transition-colors">Login</Text>
+                            </TouchableOpacity>
+                        )}
+
                         <TouchableOpacity
                             onPress={() => router.push('/pricing')}
                             className="bg-kiitos-orange px-5 py-2.5 rounded-full shadow-lg shadow-kiitos-orange/20 hover:bg-orange-600 transition-colors"
@@ -42,9 +83,13 @@ export default function LandingPage() {
                         <TouchableOpacity className="py-3 px-2 rounded-lg hover:bg-gray-50" onPress={() => router.push('/pricing')}>
                             <Text className="text-gray-800 font-medium text-lg">For Restaurants</Text>
                         </TouchableOpacity>
-                        <TouchableOpacity className="py-3 px-2 rounded-lg hover:bg-gray-50" onPress={() => router.push('/login' as any)}>
-                            <Text className="text-gray-800 font-medium text-lg">Login</Text>
+
+                        <TouchableOpacity className="py-3 px-2 rounded-lg hover:bg-gray-50" onPress={handleDashboardNavigation}>
+                            <Text className="text-gray-800 font-medium text-lg">
+                                {user ? `Dashboard (${user.role})` : 'Login'}
+                            </Text>
                         </TouchableOpacity>
+
                         <TouchableOpacity
                             onPress={() => router.push('/pricing')}
                             className="mt-4 bg-kiitos-orange px-5 py-3 rounded-xl items-center"
