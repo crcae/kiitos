@@ -9,11 +9,13 @@ import {
     ActivityIndicator,
     TextInput,
     KeyboardAvoidingView,
-    ScrollView
+    ScrollView,
+    Modal
 } from 'react-native';
 import { CountryPicker } from 'react-native-country-codes-picker';
-import { Smartphone, User, ChevronDown } from 'lucide-react-native';
-import { auth, db } from '../../services/firebaseConfig';
+import { Smartphone, User, ChevronDown, X } from 'lucide-react-native';
+import { WebView } from 'react-native-webview';
+import { auth, db, firebaseConfig } from '../../services/firebaseConfig';
 import { PhoneAuthProvider, signInWithCredential, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
 import { doc, getDoc, setDoc, Timestamp } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
@@ -39,56 +41,34 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
     const [tempFirebaseUser, setTempFirebaseUser] = useState<any>(null);
     const [showCountryPicker, setShowCountryPicker] = useState(false);
 
+    // Native reCAPTCHA/WebView state
+    const [showRecaptcha, setShowRecaptcha] = useState(false);
+
     const recaptchaVerifierRef = useRef<RecaptchaVerifier | null>(null);
 
     useEffect(() => {
-        if (Platform.OS === 'web') {
-            // Hybrid approach: Enable bypass in development, disable in production
-            // Development (__DEV__ = true): Use test phone numbers without SMS
-            // Production (__DEV__ = false): Real SMS with reCAPTCHA validation
-            if (__DEV__) {
-                console.log('🔧 Development mode: reCAPTCHA bypass enabled');
-                console.log('📱 Use test phone numbers from Firebase Console for testing');
-                auth.settings.appVerificationDisabledForTesting = true;
-            } else {
-                console.log('🚀 Production mode: reCAPTCHA validation enabled');
-                auth.settings.appVerificationDisabledForTesting = false;
-            }
+        // Initialize RecaptchaVerifier on web only
+        if (Platform.OS === 'web' && !recaptchaVerifierRef.current) {
+            try {
+                const verifier = new RecaptchaVerifier(auth, 'customer-recaptcha-container', {
+                    'size': 'invisible',
+                    'callback': (response: any) => {
+                        console.log('✅ reCAPTCHA verification successful');
+                    },
+                    'expired-callback': () => {
+                        console.warn('⚠️ reCAPTCHA expired, user may need to retry');
+                    }
+                });
 
-            if (!recaptchaVerifierRef.current) {
-                try {
-                    // Initialize invisible reCAPTCHA
-                    const verifier = new RecaptchaVerifier(auth, 'customer-recaptcha-container', {
-                        'size': 'invisible',
-                        'callback': (response: any) => {
-                            console.log('✅ reCAPTCHA verification successful');
-                        },
-                        'expired-callback': () => {
-                            console.warn('⚠️ reCAPTCHA expired, user may need to retry');
-                        }
-                    });
+                recaptchaVerifierRef.current = verifier;
 
-                    recaptchaVerifierRef.current = verifier;
-
-                    // Render the verifier to ensure it's ready
-                    verifier.render().then((widgetId) => {
-                        console.log('reCAPTCHA widget initialized with ID:', widgetId);
-                    }).catch(err => {
-                        // In development with bypass enabled, render errors are expected
-                        if (__DEV__) {
-                            console.log('reCAPTCHA render skipped in development mode:', err.message);
-                        } else {
-                            // In production, this is a critical error
-                            console.error("❌ reCAPTCHA initialization failed:", err);
-                            Alert.alert(
-                                "Error de Seguridad",
-                                "No se pudo inicializar el sistema de seguridad. Por favor verifica tu conexión e intenta de nuevo."
-                            );
-                        }
-                    });
-                } catch (e) {
-                    console.error('RecaptchaVerifier creation error:', e);
-                }
+                verifier.render().then((widgetId) => {
+                    console.log('reCAPTCHA widget initialized with ID:', widgetId);
+                }).catch((err) => {
+                    console.error('❌ Failed to initialize reCAPTCHA Enterprise:', err);
+                });
+            } catch (e) {
+                console.error('RecaptchaVerifier creation error:', e);
             }
         }
 
@@ -104,7 +84,33 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
         };
     }, []);
 
+    const handleNativeRecaptchaMessage = (event: any) => {
+        try {
+            const data = JSON.parse(event.nativeEvent.data);
 
+            if (data.type === 'verificationId') {
+                console.log("✅ Verification ID received from WebView:", data.value);
+                setShowRecaptcha(false);
+                setVerificationId(data.value);
+                setStep('otp');
+                setLoading(false);
+            } else if (data.type === 'error') {
+                console.error("❌ WebView Error:", data.value);
+                setShowRecaptcha(false);
+                setLoading(false);
+                Alert.alert("Error", data.value || "Error en la verificación");
+            } else if (data.type === 'log') {
+                console.log('📱 WebView Log:', data.value);
+            }
+        } catch (e) {
+            console.log('Raw WebView message:', event.nativeEvent.data);
+            if (event.nativeEvent.data === 'expired') {
+                Alert.alert('Error', 'La verificación expiró. Inténtalo de nuevo.');
+                setShowRecaptcha(false);
+                setLoading(false);
+            }
+        }
+    };
 
     const handleSendCode = async () => {
         if (!phone || phone.length < 8) {
@@ -112,29 +118,29 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
             return;
         }
         setLoading(true);
-        try {
-            const formattedPhone = `${countryCode}${phone.replace(/\s/g, '')}`;
 
-            let appVerifier;
-            if (Platform.OS === 'web') {
-                appVerifier = recaptchaVerifierRef.current;
+        const formattedPhone = `${countryCode}${phone.replace(/\s/g, '')}`;
+
+        if (Platform.OS === 'web') {
+            try {
+                let appVerifier = recaptchaVerifierRef.current;
                 if (!appVerifier) {
                     throw new Error("reCAPTCHA no se ha inicializado correctamente. Por favor recarga la página.");
                 }
-            } else {
-                // For mobile, we might need a different invisible verifier or use the default
-                appVerifier = (recaptchaVerifierRef.current as any);
+                const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+                setVerificationId(confirmationResult.verificationId);
+                setStep('otp');
+            } catch (error: any) {
+                console.error("Send Code Error Web:", error);
+                Alert.alert("Error", error.message);
+            } finally {
+                setLoading(false);
             }
-
-            const confirmationResult = await signInWithPhoneNumber(auth, formattedPhone, appVerifier!);
-            setVerificationId(confirmationResult.verificationId);
-            setStep('otp');
-        } catch (error: any) {
-            console.error("Send Code Error:", error);
-            const errorMessage = error.message || "No se pudo enviar el código. Revisa tu número.";
-            Alert.alert("Error", errorMessage);
-        } finally {
-            setLoading(false);
+        } else {
+            // Mobile: Open WebView to handle the entire flow
+            console.log("Opening WebView for verification:", formattedPhone);
+            setShowRecaptcha(true);
+            // Loading state remains TRUE until WebView returns success or error
         }
     };
 
@@ -146,7 +152,6 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
             const userCredential = await signInWithCredential(auth, credential);
             const fUser = userCredential.user;
 
-            // Check if user exists in Firestore
             const userDoc = await getDoc(doc(db, 'users', fUser.uid));
             if (userDoc.exists()) {
                 await refreshUser();
@@ -187,6 +192,78 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
             setLoading(false);
         }
     };
+
+    // HTML that handles signInWithPhoneNumber internally in the WebView
+    const recaptchaHtml = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+            <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+            <style>
+                body { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+                .loader { border: 4px solid #f3f3f3; border-top: 4px solid #F97316; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin-bottom: 20px; }
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                #status { font-size: 16px; color: #333; text-align: center; padding: 20px; }
+                #recaptcha-container { margin-top: 20px; }
+            </style>
+        </head>
+        <body>
+            <div class="loader"></div>
+            <div id="status">Iniciando verificación de seguridad...</div>
+            <div id="recaptcha-container"></div>
+            
+            <script>
+                const firebaseConfig = ${JSON.stringify(firebaseConfig)};
+                firebase.initializeApp(firebaseConfig);
+                const auth = firebase.auth();
+                auth.languageCode = 'es';
+                
+                // Force reCAPTCHA verification
+                auth.settings.appVerificationDisabledForTesting = false;
+
+                function log(msg) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({type: 'log', value: msg}));
+                }
+
+                function sendError(msg) {
+                    window.ReactNativeWebView.postMessage(JSON.stringify({type: 'error', value: msg}));
+                }
+
+                // Global function called by injectedJavaScript
+                window.verifyAndSend = function(phoneNumber) {
+                    log('Starting flow for: ' + phoneNumber);
+                    document.getElementById('status').innerText = "Verificando que no eres un robot...";
+                    
+                    const verifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                        'size': 'invisible', 
+                        'callback': function(response) {
+                            log('ReCAPTCHA solved');
+                            document.getElementById('status').innerText = "Enviando SMS...";
+                        },
+                        'expired-callback': function() {
+                            sendError('ReCAPTCHA expired');
+                        }
+                    });
+
+                    auth.signInWithPhoneNumber(phoneNumber, verifier)
+                        .then(function(confirmationResult) {
+                            log('SMS sent successfully! ID: ' + confirmationResult.verificationId);
+                            window.ReactNativeWebView.postMessage(JSON.stringify({
+                                type: 'verificationId', 
+                                value: confirmationResult.verificationId
+                            }));
+                        })
+                        .catch(function(error) {
+                            log('Firebase Error: ' + error.code + ' - ' + error.message);
+                            sendError(error.message);
+                        });
+                };
+            </script>
+        </body>
+        </html>
+    `;
 
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
@@ -286,7 +363,6 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
                     </View>
                 )}
 
-                {/* Country Picker Modal */}
                 <CountryPicker
                     show={showCountryPicker}
                     pickerButtonOnPress={(item) => {
@@ -302,6 +378,45 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
                     }}
                     lang={'es'}
                 />
+
+                {/* Native reCAPTCHA Modal (WebView) */}
+                {showRecaptcha && Platform.OS !== 'web' && (
+                    <Modal visible={true} transparent={true} animationType="slide" onRequestClose={() => {
+                        setShowRecaptcha(false);
+                        setLoading(false);
+                    }}>
+                        <View style={styles.recaptchaModalContainer}>
+                            <View style={styles.recaptchaHeader}>
+                                <Text style={styles.recaptchaTitle}>Verificación de seguridad</Text>
+                                <TouchableOpacity onPress={() => {
+                                    setShowRecaptcha(false);
+                                    setLoading(false);
+                                }}>
+                                    <X size={24} color="#000" />
+                                </TouchableOpacity>
+                            </View>
+                            <WebView
+                                originWhitelist={['*']}
+                                source={{ html: recaptchaHtml, baseUrl: 'https://kiitos-app.firebaseapp.com' }}
+                                onMessage={handleNativeRecaptchaMessage}
+                                javaScriptEnabled={true}
+                                domStorageEnabled={true}
+                                injectedJavaScript={`
+                                    setTimeout(function() {
+                                        if (window.verifyAndSend) {
+                                            window.verifyAndSend('${countryCode}${phone.replace(/\s/g, '')}');
+                                        } else {
+                                            window.ReactNativeWebView.postMessage(JSON.stringify({type: 'error', value: 'Function not loaded'}));
+                                        }
+                                    }, 1000);
+                                    true;
+                                `}
+                                style={{ flex: 1 }}
+                            />
+                        </View>
+                    </Modal>
+                )}
+
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -441,5 +556,34 @@ const styles = StyleSheet.create({
         width: 1,
         opacity: 0,
         overflow: 'hidden',
-    }
+    },
+    recaptchaModalContainer: {
+        flex: 1,
+        backgroundColor: 'white',
+        marginTop: 60,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        overflow: 'hidden',
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: -2,
+        },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+        elevation: 5,
+    },
+    recaptchaHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 16,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+        backgroundColor: '#fff',
+    },
+    recaptchaTitle: {
+        fontSize: 18,
+        fontWeight: '600',
+    },
 });
