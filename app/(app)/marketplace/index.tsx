@@ -4,6 +4,7 @@ import { useRouter, useNavigation } from 'expo-router';
 import { Search, MapPin, Star, ChevronDown, Clock, Camera as CameraIcon, ShoppingBag, ScanLine, User } from 'lucide-react-native';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -33,6 +34,8 @@ export default function MarketplaceHome() {
     const [restaurants, setRestaurants] = useState<MarketplaceRestaurant[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const isFocused = useIsFocused();
+    const [sheetIndex, setSheetIndex] = useState(0);
 
     // BottomSheet Ref
     const bottomSheetRef = useRef<BottomSheet>(null);
@@ -41,6 +44,20 @@ export default function MarketplaceHome() {
 
     // Camera State
     const [scanned, setScanned] = useState(false);
+    // Ref to prevent multiple rapid scans before state updates
+    const isProcessingScan = useRef(false);
+
+    // Reset scan state when screen is focused
+    useEffect(() => {
+        if (isFocused) {
+            // Add a small delay to prevent immediate rescanning if user just came back
+            const timer = setTimeout(() => {
+                setScanned(false);
+                isProcessingScan.current = false;
+            }, 1500);
+            return () => clearTimeout(timer);
+        }
+    }, [isFocused]);
 
     const { currentAction, resetAction } = useMarketStore();
 
@@ -104,24 +121,79 @@ export default function MarketplaceHome() {
     };
 
     const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
-        if (scanned) return;
+        if (scanned || !isFocused || sheetIndex !== 0 || isProcessingScan.current) return;
+
+        isProcessingScan.current = true;
         setScanned(true);
         Vibration.vibrate();
 
-        let targetId = data;
-        if (data.includes('/')) {
-            const parts = data.split('/');
-            targetId = parts[parts.length - 1];
-        }
-
-        Alert.alert("Menu Found!", "Redirecting...", [
-            {
-                text: "OK", onPress: () => {
-                    router.push(`/takeout/${targetId}`);
-                    setTimeout(() => setScanned(false), 2000);
-                }
+        try {
+            // Check if it's a valid URL
+            if (!data.startsWith('http://') && !data.startsWith('https://')) {
+                throw new Error("Invalid QR Code format");
             }
-        ]);
+
+            const urlObj = new URL(data);
+            const { hostname, pathname, searchParams } = urlObj;
+
+            // Domain Validation
+            const validDomains = ['localhost', 'kiitos-app.web.app', 'kiitos-app.firebaseapp.com', '192.168.', '10.0.', '172.']; // Add internal IPs for dev
+            const isValidDomain = validDomains.some(d => hostname.includes(d));
+
+            if (!isValidDomain) {
+                Alert.alert("Invalid QR", "This QR code is outside of the app's domain.", [
+                    { text: "OK", onPress: () => setTimeout(() => setScanned(false), 2000) }
+                ]);
+                return;
+            }
+
+            // Route Handling
+            if (pathname.includes('/menu/')) {
+                // Format: /menu/:restaurantId/:tableId
+                // Regex to capture IDs
+                const match = pathname.match(/\/menu\/([^/]+)\/([^/]+)/);
+                if (match) {
+                    const [_, restaurantId, tableId] = match;
+                    router.push(`/menu/${restaurantId}/${tableId}`);
+                } else {
+                    throw new Error("Invalid Menu QR");
+                }
+            } else if (pathname.includes('/takeout/')) {
+                // Format: /takeout/:restaurantId
+                const match = pathname.match(/\/takeout\/([^/]+)/);
+                if (match) {
+                    const [_, restaurantId] = match;
+                    router.push(`/takeout/${restaurantId}`);
+                } else {
+                    throw new Error("Invalid Takeout QR");
+                }
+            } else if (pathname.includes('/login/staff')) {
+                // Format: /login/staff?restaurantId=...
+                const restaurantId = searchParams.get('restaurantId');
+                if (restaurantId) {
+                    router.push({
+                        pathname: '/(auth)/login/staff',
+                        params: { restaurantId }
+                    });
+                } else {
+                    throw new Error("Missing restaurant info for Login");
+                }
+            } else {
+                Alert.alert("Unknown QR", "This QR code is not supported.", [
+                    { text: "OK", onPress: () => setTimeout(() => setScanned(false), 2000) }
+                ]);
+                return;
+            }
+
+            // Navigation happens, state will be reset when coming back to focus
+            // Removed automatic setTimeout reset to avoid race conditions
+
+        } catch (error) {
+            console.warn("QR Scan Error:", error);
+            Alert.alert("Error", "Could not process this QR code.", [
+                { text: "OK", onPress: () => setTimeout(() => setScanned(false), 2000) }
+            ]);
+        }
     };
 
     const filteredRestaurants = restaurants.filter(r =>
@@ -151,7 +223,7 @@ export default function MarketplaceHome() {
                     <CameraView
                         style={{ flex: 1 }}
                         facing="back"
-                        onBarcodeScanned={scanned ? undefined : handleBarCodeScanned}
+                        onBarcodeScanned={scanned || !isFocused || sheetIndex !== 0 ? undefined : handleBarCodeScanned}
                         barcodeScannerSettings={{
                             barcodeTypes: ["qr"],
                         }}
@@ -181,6 +253,7 @@ export default function MarketplaceHome() {
                     ref={bottomSheetRef}
                     index={0} // Start collapsed (Scan mode)
                     snapPoints={snapPoints}
+                    onChange={(index) => setSheetIndex(index)}
                     enablePanDownToClose={false}
                     backgroundStyle={{ backgroundColor: "#fafaf9", borderRadius: 24 }}
                     handleIndicatorStyle={{ backgroundColor: "#d6d3d1", width: 40 }}
@@ -237,7 +310,7 @@ export default function MarketplaceHome() {
                                             <Image
                                                 source={{ uri: cat.image }}
                                                 className="w-16 h-16 rounded-full bg-stone-200"
-                                                contentFit="cover"
+                                                resizeMode="cover"
                                             />
                                             <Text className="text-stone-700 text-xs font-medium mt-2">{cat.name}</Text>
                                         </TouchableOpacity>
@@ -251,7 +324,7 @@ export default function MarketplaceHome() {
                                     <Image
                                         source={{ uri: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80' }}
                                         className="absolute right-0 top-0 w-3/5 h-full opacity-40"
-                                        contentFit="cover"
+                                        resizeMode="cover"
                                     />
                                     <View className="p-6 justify-center h-full max-w-[60%]">
                                         <Text className="text-white font-bold text-2xl mb-1">Pickup Deal</Text>
@@ -286,7 +359,7 @@ export default function MarketplaceHome() {
                                                 <Image
                                                     source={{ uri: restaurant.settings?.branding?.cover_image_url || 'https://via.placeholder.com/400x300' }}
                                                     className="w-full h-40 bg-stone-200"
-                                                    contentFit="cover"
+                                                    resizeMode="cover"
                                                 />
                                                 <View className="p-4">
                                                     <View className="flex-row justify-between items-start mb-1">

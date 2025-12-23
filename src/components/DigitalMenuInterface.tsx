@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { View, Text, FlatList, TouchableOpacity, Image, ScrollView, ActivityIndicator, StatusBar, Platform, Modal, TextInput } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShoppingBag, ChevronLeft, Plus, Minus, FileText, Utensils, CheckCircle, Clock } from 'lucide-react-native';
 import { colors } from '../styles/theme';
@@ -26,11 +25,14 @@ interface DigitalMenuInterfaceProps {
     directSessionData?: OrderItem[]; // [CASHIER MODE] Inject live order items directly
     onSuccess?: () => void; // Callback when order is sent successfully
     onRequestPayment?: () => void; // Callback to switch to payment
+    navigationProp?: any;
+    routerProp?: any;
 }
 
-export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'guest', sessionId: initialSessionId, onCheckout, directSessionData, onSuccess, onRequestPayment }: DigitalMenuInterfaceProps) {
+export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'guest', sessionId: initialSessionId, onCheckout, directSessionData, onSuccess, onRequestPayment, navigationProp, routerProp }: DigitalMenuInterfaceProps) {
     const insets = useSafeAreaInsets();
-    const router = useRouter();
+    // const router = useRouter();
+    // const navigation = useNavigation<any>();
 
     // Data State
     const [categories, setCategories] = useState<Category[]>([]);
@@ -331,14 +333,25 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
         }
 
         if (currentSessionId) {
-            router.push({
-                pathname: "/pay/[id]",
-                params: {
+            if (routerProp && typeof routerProp.push === 'function') {
+                routerProp.push({
+                    pathname: "/pay/[id]",
+                    params: {
+                        id: currentSessionId,
+                        restaurantId: restaurantId,
+                        mode: mode
+                    }
+                });
+            } else if (navigationProp) {
+                // Fallback
+                navigationProp.navigate('pay/[id]', {
                     id: currentSessionId,
                     restaurantId: restaurantId,
-                    mode: mode // Pass the mode ('guest' or 'waiter') to the payment screen
-                }
-            });
+                    mode: mode
+                });
+            } else {
+                console.error("No navigation or router prop available");
+            }
         } else {
             alert("No active session found.");
         }
