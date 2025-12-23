@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, ScrollView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform, Image } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import {
     LayoutDashboard,
@@ -84,10 +84,14 @@ export default function AdminSidebar({
             <View className="px-4 py-6 flex-1">
                 {/* Logo Section */}
                 <View className={`flex-row items-center mb-10 px-2 ${isCollapsed ? 'justify-center' : ''}`}>
-                    <View className="w-10 h-10 bg-indigo-600 rounded-2xl items-center justify-center shadow-lg shadow-indigo-600/20">
-                        <Text className="text-white font-black text-xl">K</Text>
+                    <View className="w-10 h-10 items-center justify-center">
+                        <Image
+                            source={require('../../../assets/logo-kitos.png')}
+                            style={{ width: 40, height: 40, borderRadius: 12 }}
+                            resizeMode="contain"
+                        />
                     </View>
-                    {!isCollapsed && <Text className="ml-4 text-white font-black text-2xl tracking-tighter">KIITOS</Text>}
+                    {!isCollapsed && <Text className="ml-4 text-white font-black text-2xl tracking-tighter">KITOS</Text>}
                 </View>
 
                 {!isCollapsed && (

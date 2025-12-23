@@ -1,22 +1,25 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, ScrollView, RefreshControl, ActivityIndicator, Dimensions } from 'react-native';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { View, Text, ScrollView, RefreshControl, ActivityIndicator, Dimensions, Pressable } from 'react-native';
 import {
     TrendingUp,
     DollarSign,
     ShoppingBag,
     Table as TableIcon,
     ArrowUpRight,
-    ArrowDownRight
+    ArrowDownRight,
+    Filter
 } from 'lucide-react-native';
 import { LineChart, BarChart, PieChart } from 'react-native-gifted-charts';
 import { startOfDay, endOfDay } from 'date-fns';
 
 import { useAuth } from '../../src/context/AuthContext';
 import { useRestaurant } from '../../src/hooks/useRestaurant';
-import { getDashboardMetrics } from '../../src/services/adminAnalytics';
+import { getDashboardMetrics, calculateMetricsFromOrders, UnifiedOrder } from '../../src/services/adminAnalytics';
 import DateRangeSelector, { DateRange } from '../../src/components/admin/DateRangeSelector';
 
 const SCREEN_WIDTH = Dimensions.get('window').width;
+
+type FilterType = 'all' | 'dine-in' | 'takeout';
 
 export default function AdminDashboard() {
     const { user } = useAuth();
@@ -25,20 +28,23 @@ export default function AdminDashboard() {
     const [refreshing, setRefreshing] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Filter State
+    // Filter State (Date)
     const [activeRange, setActiveRange] = useState<DateRange>('today');
     const [startDate, setStartDate] = useState(startOfDay(new Date()));
     const [endDate, setEndDate] = useState(endOfDay(new Date()));
 
+    // Filter State (Channel)
+    const [filterType, setFilterType] = useState<FilterType>('all');
+
     // Data State
-    const [data, setData] = useState<any>(null);
+    const [data, setData] = useState<{ orders: UnifiedOrder[], metrics: any } | null>(null);
 
     const fetchData = useCallback(async () => {
         if (!user?.restaurantId) return;
         setLoading(true);
         try {
-            const metrics = await getDashboardMetrics(user.restaurantId, startDate, endDate);
-            setData(metrics);
+            const result = await getDashboardMetrics(user.restaurantId, startDate, endDate);
+            setData(result);
         } catch (error) {
             console.error('Error fetching metrics:', error);
         } finally {
@@ -50,6 +56,15 @@ export default function AdminDashboard() {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    // Calculate metrics based on filtered orders
+    const displayMetrics = useMemo(() => {
+        if (!data) return null;
+        if (filterType === 'all') return data.metrics;
+
+        const filteredOrders = data.orders.filter(o => o.sourceType === filterType);
+        return calculateMetricsFromOrders(filteredOrders, startDate, endDate);
+    }, [data, filterType, startDate, endDate]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -80,6 +95,26 @@ export default function AdminDashboard() {
         </View>
     );
 
+    const FilterToggle = () => (
+        <View className="flex-row bg-slate-900/80 p-1.5 rounded-2xl border border-slate-800/50 mb-6 self-start">
+            {[
+                { id: 'all', label: 'Todos' },
+                { id: 'dine-in', label: 'Restaurante' },
+                { id: 'takeout', label: 'Para Llevar' }
+            ].map((option) => (
+                <Pressable
+                    key={option.id}
+                    onPress={() => setFilterType(option.id as FilterType)}
+                    className={`px-6 py-2 rounded-xl ${filterType === option.id ? 'bg-indigo-500' : 'bg-transparent'}`}
+                >
+                    <Text className={`text-[11px] font-black uppercase tracking-wider ${filterType === option.id ? 'text-white' : 'text-slate-500'}`}>
+                        {option.label}
+                    </Text>
+                </Pressable>
+            ))}
+        </View>
+    );
+
     if (loading && !refreshing && !data) {
         return (
             <View className="flex-1 items-center justify-center">
@@ -88,6 +123,8 @@ export default function AdminDashboard() {
             </View>
         );
     }
+
+    const { kpis, charts } = displayMetrics || { kpis: {}, charts: { salesHistory: [], peakHours: [], payments: [] } };
 
     return (
         <ScrollView
@@ -99,7 +136,9 @@ export default function AdminDashboard() {
             <View className="flex-row flex-wrap justify-between items-end mb-8 gap-4">
                 <View>
                     <Text className="text-indigo-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Visión General</Text>
-                    <Text className="text-4xl font-black text-white">{restaurant?.name || 'Dashboard'}</Text>
+                    <View className="flex-row items-center gap-4">
+                        <Text className="text-4xl font-black text-white">{restaurant?.name || 'Dashboard'}</Text>
+                    </View>
                 </View>
                 <DateRangeSelector
                     activeRange={activeRange}
@@ -109,29 +148,32 @@ export default function AdminDashboard() {
                 />
             </View>
 
+            {/* Channel Filter Toggle */}
+            <FilterToggle />
+
             {/* KPI Grid */}
             <View className="flex-row flex-wrap -m-2 mb-8">
                 <KPICard
                     title="Ventas Totales"
-                    value={`$${(data?.kpis.totalSales || 0).toFixed(2)}`}
+                    value={`$${(kpis.totalSales || 0).toFixed(2)}`}
                     icon={DollarSign}
                     color="#10b981"
                 />
                 <KPICard
                     title="Ticket Promedio"
-                    value={`$${(data?.kpis.avgTicket || 0).toFixed(2)}`}
+                    value={`$${(kpis.avgTicket || 0).toFixed(2)}`}
                     icon={TrendingUp}
                     color="#6366f1"
                 />
                 <KPICard
                     title="Propinas"
-                    value={`$${(data?.kpis.totalTips || 0).toFixed(2)}`}
+                    value={`$${(kpis.totalTips || 0).toFixed(2)}`}
                     icon={ShoppingBag}
                     color="#3b82f6"
                 />
                 <KPICard
                     title="Ocupación"
-                    value={`${data?.kpis.activeTables} Activas`}
+                    value={filterType === 'takeout' ? `${kpis.activePickup || 0} Pickup` : `${kpis.activeTables || 0} Activas`}
                     icon={TableIcon}
                     color="#f59e0b"
                 />
@@ -143,9 +185,9 @@ export default function AdminDashboard() {
                 <View className="flex-1 min-w-[320px] m-3 bg-slate-900/50 p-6 rounded-[32px] border border-slate-800/50">
                     <Text className="text-white font-black text-lg mb-6">Ventas Historico</Text>
                     <View className="items-center">
-                        {data?.charts.salesHistory.length > 0 ? (
+                        {charts.salesHistory.length > 0 ? (
                             <LineChart
-                                data={data.charts.salesHistory}
+                                data={charts.salesHistory}
                                 width={SCREEN_WIDTH > 1000 ? 500 : SCREEN_WIDTH - 120}
                                 height={200}
                                 color="#6366f1"
@@ -167,10 +209,10 @@ export default function AdminDashboard() {
                 <View className="w-full md:w-[320px] m-3 bg-slate-900/50 p-6 rounded-[32px] border border-slate-800/50">
                     <Text className="text-white font-black text-lg mb-6">Métodos de Pago</Text>
                     <View className="items-center">
-                        {data?.charts.payments.reduce((a: any, b: any) => a + b.value, 0) > 0 ? (
+                        {charts.payments.reduce((a: any, b: any) => a + b.value, 0) > 0 ? (
                             <>
                                 <PieChart
-                                    data={data?.charts.payments}
+                                    data={charts.payments}
                                     donut
                                     showGradient={false}
                                     sectionAutoFocus
@@ -184,7 +226,7 @@ export default function AdminDashboard() {
                                     )}
                                 />
                                 <View className="mt-6 flex-row flex-wrap justify-center gap-4">
-                                    {data?.charts.payments.map((p: any) => (
+                                    {charts.payments.map((p: any) => (
                                         <View key={p.name} className="flex-row items-center">
                                             <View className="w-2 h-2 rounded-full mr-2" style={{ backgroundColor: p.color }} />
                                             <Text className="text-slate-400 text-[10px] font-bold uppercase">{p.name}</Text>
@@ -208,9 +250,9 @@ export default function AdminDashboard() {
                     </View>
                 </View>
                 <View className="items-center">
-                    {data?.charts.peakHours.length > 0 ? (
+                    {charts.peakHours.length > 0 ? (
                         <BarChart
-                            data={data.charts.peakHours}
+                            data={charts.peakHours}
                             barWidth={SCREEN_WIDTH > 1000 ? 30 : 20}
                             noOfSections={4}
                             barBorderRadius={6}

@@ -40,7 +40,7 @@ export default function AdminLayout() {
                     <TouchableOpacity onPress={() => setIsMobileMenuOpen(true)}>
                         <MenuIcon color="white" size={24} />
                     </TouchableOpacity>
-                    <Text className="text-white font-black tracking-tighter text-xl">KIITOS</Text>
+                    <Text className="text-white font-black tracking-tighter text-xl">KITOS</Text>
                     <View className="w-6" />
                 </View>
             )}

@@ -178,34 +178,112 @@ export const getTodayStats = async (restaurantId: string) => {
 };
 
 /**
+ * Unified Order interface for internal dashboard representation
+ */
+export interface UnifiedOrder {
+    id: string;
+    sourceType: 'dine-in' | 'takeout';
+    status: 'active' | 'closed'; // Mapping PickupOrderStatus to active/closed
+    timestamp: Date;
+    total: number;
+    tips: number;
+    items: any[];
+    paymentMethods: { Cash: number; Card: number; App: number };
+}
+
+/**
  * Fetch all unified metrics for the dashboard home
  */
 export const getDashboardMetrics = async (restaurantId: string, startDate: Date, endDate: Date) => {
+    // 1. Fetch Sessions (Dine-in)
     const sessionsRef = collection(db, 'restaurants', restaurantId, 'sessions');
-
-    // We fetch all sessions in range. Using startTime for filtering.
-    // Client-side filtering/sorting to avoid complex indexes for now
-    const q = query(
+    const qSessions = query(
         sessionsRef,
         where('startTime', '>=', Timestamp.fromDate(startDate)),
         where('startTime', '<=', Timestamp.fromDate(endDate))
     );
+    const snapSessions = await getDocs(qSessions);
+    const sessions = snapSessions.docs.map(d => ({ id: d.id, ...d.data() } as Session));
 
-    const snap = await getDocs(q);
-    const sessions = snap.docs.map(d => ({ id: d.id, ...d.data() } as Session));
+    // 2. Fetch Pickup Orders (Takeout)
+    const pickupRef = collection(db, 'restaurants', restaurantId, 'pickup_orders');
+    const qPickup = query(
+        pickupRef,
+        where('created_at', '>=', Timestamp.fromDate(startDate)),
+        where('created_at', '<=', Timestamp.fromDate(endDate))
+    );
+    const snapPickup = await getDocs(qPickup);
+    const pickupOrders = snapPickup.docs.map(d => ({ id: d.id, ...d.data() } as any)); // Use any to avoid strict interface issues for now
 
-    const closedSessions = sessions.filter(s => s.status === 'closed');
-    const activeSessions = sessions.filter(s => s.status === 'active');
+    // 3. Normalize into UnifiedOrders
+    const unifiedOrders: UnifiedOrder[] = [];
+
+    // Process Sessions
+    for (const session of sessions) {
+        let totalTips = 0;
+        const paymentMethods = { Cash: 0, Card: 0, App: 0 };
+
+        const paymentsRef = collection(db, 'restaurants', restaurantId, 'sessions', session.id, 'payments');
+        const psnap = await getDocs(paymentsRef);
+        psnap.forEach(d => {
+            const p = d.data() as Payment;
+            totalTips += (p.tip || 0);
+            const method = p.method === 'cash' ? 'Cash' : (p.method === 'stripe' ? 'App' : 'Card');
+            paymentMethods[method] += (p.amount || 0);
+        });
+
+        unifiedOrders.push({
+            id: session.id,
+            sourceType: 'dine-in',
+            status: session.status === 'closed' ? 'closed' : 'active',
+            timestamp: session.startTime?.toDate() || new Date(),
+            total: session.total || 0,
+            tips: totalTips,
+            items: session.items || [],
+            paymentMethods
+        });
+    }
+
+    // Process Pickup Orders
+    for (const order of pickupOrders) {
+        // For pickup orders, we'll assume they are "closed" if they are completed
+        // And "active" if they are preparing or ready
+        const isClosed = order.status === 'completed';
+        const isActive = ['preparing', 'ready', 'scheduled'].includes(order.status);
+
+        unifiedOrders.push({
+            id: order.id,
+            sourceType: 'takeout',
+            status: isClosed ? 'closed' : (isActive ? 'active' : 'closed'), // Defaulting to closed if cancelled? Let's say closed but 0 total if cancelled?
+            timestamp: order.created_at?.toDate() || new Date(),
+            total: order.status === 'cancelled' ? 0 : (order.total || 0),
+            tips: 0, // Pickup orders tip handling might be different, keeping it 0 for now
+            items: order.items || [],
+            paymentMethods: { Cash: 0, Card: 1, App: (order.payment_intent_id ? (order.total || 0) : 0) } // Stripe for pickup
+        });
+    }
+
+    const initialMetrics = calculateMetricsFromOrders(unifiedOrders, startDate, endDate);
+
+    return {
+        orders: unifiedOrders,
+        metrics: initialMetrics
+    };
+};
+
+/**
+ * Pure function to calculate metrics from a list of unified orders
+ */
+export const calculateMetricsFromOrders = (orders: UnifiedOrder[], startDate: Date, endDate: Date) => {
+    const closedOrders = orders.filter(o => o.status === 'closed');
+    const activeOrders = orders.filter(o => o.status === 'active');
 
     // KPIs
-    const totalSales = closedSessions.reduce((sum, s) => sum + (s.total || 0), 0);
-    const avgTicket = closedSessions.length > 0 ? totalSales / closedSessions.length : 0;
+    const totalSales = closedOrders.reduce((sum, o) => sum + o.total, 0);
+    const avgTicket = closedOrders.length > 0 ? totalSales / closedOrders.length : 0;
+    const totalTips = orders.reduce((sum, o) => sum + o.tips, 0);
 
-    // Tips calculation (requires subcollection fetch)
-    let totalTips = 0;
     const paymentMethods = { Cash: 0, Card: 0, App: 0 };
-    const categorySales = new Map<string, number>();
-    // Track two types of aggregations
     const historicalSales: { [key: string]: number } = {};
     const peakSales: { [key: string]: number } = {};
 
@@ -217,36 +295,23 @@ export const getDashboardMetrics = async (restaurantId: string, startDate: Date,
 
     const dayDiff = Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 3600 * 24)));
 
-    for (const session of sessions) {
-        // Fetch tips and methods
-        const paymentsRef = collection(db, 'restaurants', restaurantId, 'sessions', session.id, 'payments');
-        const psnap = await getDocs(paymentsRef);
-        psnap.forEach(d => {
-            const p = d.data() as Payment;
-            totalTips += (p.tip || 0);
+    for (const order of orders) {
+        // Aggregate payment methods
+        paymentMethods.Cash += order.paymentMethods.Cash;
+        paymentMethods.Card += order.paymentMethods.Card;
+        paymentMethods.App += order.paymentMethods.App;
 
-            const method = p.method === 'cash' ? 'Cash' : (p.method === 'stripe' ? 'App' : 'Card');
-            paymentMethods[method] += (p.amount || 0);
-        });
+        // Aggregations for charts (only closed orders for sales consistency)
+        if (order.status === 'closed') {
+            const date = order.timestamp;
 
-        // Categories aggregation
-        (session.items || []).forEach(item => {
-            const category = 'General';
-            const current = categorySales.get(category) || 0;
-            categorySales.set(category, current + (item.price * item.quantity));
-        });
-
-        // Aggregations
-        if (session.status === 'closed' && session.startTime) {
-            const date = session.startTime.toDate();
-
-            // 1. Historical Key (Hour if <2 days, else Day)
+            // 1. Historical Key
             const histKey = dayDiff <= 2 ? format(date, 'HH:00') : format(date, 'dd/MM');
-            historicalSales[histKey] = (historicalSales[histKey] || 0) + (session.total || 0);
+            historicalSales[histKey] = (historicalSales[histKey] || 0) + order.total;
 
-            // 2. Peak Key (Always Hour)
+            // 2. Peak Key
             const peakKey = format(date, 'HH:00');
-            peakSales[peakKey] += (session.total || 0);
+            peakSales[peakKey] += order.total;
         }
     }
 
@@ -265,15 +330,6 @@ export const getDashboardMetrics = async (restaurantId: string, startDate: Date,
             value: Number((peakSales[label] / dayDiff).toFixed(2))
         }));
 
-    // Convert category sales to donut format
-    const categoryChartData = Array.from(categorySales.entries()).map(([name, value]) => ({
-        name,
-        value,
-        text: name,
-        color: '#6366f1' // Placeholder color
-    }));
-
-    // Convert payment methods to pie format
     const paymentChartData = Object.entries(paymentMethods).map(([name, value], index) => ({
         name,
         value,
@@ -286,13 +342,13 @@ export const getDashboardMetrics = async (restaurantId: string, startDate: Date,
             totalSales,
             avgTicket,
             totalTips,
-            activeTables: activeSessions.length,
-            closedTables: closedSessions.length
+            activeTables: activeOrders.filter(o => o.sourceType === 'dine-in').length,
+            activePickup: activeOrders.filter(o => o.sourceType === 'takeout').length,
+            closedOrders: closedOrders.length
         },
         charts: {
             salesHistory: historicalData,
             peakHours: peakData,
-            categories: categoryChartData,
             payments: paymentChartData
         }
     };
