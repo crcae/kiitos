@@ -35,7 +35,7 @@
     "react-async-hook": "^4.0.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",
-    "react-native-country-picker-modal": "^2.0.0",
+    "react-native-country-codes-picker": "^2.3.5",
     "react-native-css-interop": "^0.2.1",
     "react-native-gesture-handler": "^2.29.1",
     "react-native-gifted-charts": "^1.4.70",
