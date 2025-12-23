@@ -161,7 +161,7 @@ export default function MarketplaceHome() {
                 style={{ top: 60, zIndex: 5 }}
             >
                 <Text className="text-white tracking-tighter" style={{ fontSize: 42, fontWeight: '900', letterSpacing: -1 }}>
-                    Kiitos<Text style={{ color: '#f89219' }}>.</Text>
+                    Kitos<Text style={{ color: '#f89219' }}>.</Text>
                 </Text>
             </View>
 
@@ -247,7 +247,7 @@ export default function MarketplaceHome() {
                                     <Image
                                         source={{ uri: cat.image }}
                                         className="w-16 h-16 rounded-full bg-stone-200"
-                                        contentFit="cover"
+                                        resizeMode="cover"
                                     />
                                     <Text className="text-stone-700 text-xs font-medium mt-2">{cat.name}</Text>
                                 </TouchableOpacity>
@@ -261,7 +261,7 @@ export default function MarketplaceHome() {
                             <Image
                                 source={{ uri: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80' }}
                                 className="absolute right-0 top-0 w-3/5 h-full opacity-40"
-                                contentFit="cover"
+                                resizeMode="cover"
                             />
                             <View className="p-6 justify-center h-full max-w-[60%]">
                                 <Text className="text-white font-bold text-2xl mb-1">Pickup Deal</Text>
@@ -296,7 +296,7 @@ export default function MarketplaceHome() {
                                         <Image
                                             source={{ uri: restaurant.settings?.branding?.cover_image_url || 'https://via.placeholder.com/400x300' }}
                                             className="w-full h-40 bg-stone-200"
-                                            contentFit="cover"
+                                            resizeMode="cover"
                                         />
                                         <View className="p-4">
                                             <View className="flex-row justify-between items-start mb-1">

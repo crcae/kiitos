@@ -52,7 +52,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                 const staffMember = await validateStaffPin(session.restaurantId, session.pin);
 
                                 if (staffMember) {
-                                    // Hydrate user
                                     const staffUser: User = {
                                         id: currentUser.uid,
                                         email: 'staff@kiitos.app',
@@ -64,44 +63,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                                     };
                                     setUser(staffUser);
                                     setLoading(false);
-                                    return; // Exit here, success
+                                    return;
                                 }
                             }
                         }
                     } catch (e) {
                         console.error('[AuthContext] Error restoring session:', e);
                     }
-
-                    // If we got here, we failed to restore session
-                    console.log('Anonymous user detected but no valid session found. Waiting for login.');
                     setUser(null);
                 } else {
-                    // Standard Email/Password User (Restaurant Owner)
-                    // Polling Logic: Retry getting user data if it doesn't exist yet
-                    // This handles the race condition where Auth is ready but Firestore trigger hasn't finished
-                    let userData = null;
-                    let attempts = 0;
-                    const maxAttempts = 5;
-
-                    while (!userData && attempts < maxAttempts) {
-                        try {
-                            userData = await getUserData(currentUser.uid);
-                            if (userData) break;
-
-                            console.log(`[AuthContext] Firestore doc not found. Retrying ${attempts + 1}/${maxAttempts}...`);
-                            await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1s
-                            attempts++;
-                        } catch (e) {
-                            console.error("Error fetching user data during polling:", e);
-                            attempts++; // Count error as attempt
+                    // Standard User (Customer or Restaurant Owner)
+                    try {
+                        const userData = await getUserData(currentUser.uid);
+                        if (userData) {
+                            setUser(userData);
+                        } else {
+                            // If user exists in Auth but not Firestore, they might be a new signup
+                            // or a role that doesn't need a doc yet. For now, set to null
+                            // until signup completes the doc creation.
+                            setUser(null);
                         }
-                    }
-
-                    if (userData) {
-                        console.log(`[AuthContext] User data loaded for: ${userData.email}`);
-                        setUser(userData);
-                    } else {
-                        console.warn('[AuthContext] User authenticated but no Firestore document found after retries.');
+                    } catch (e) {
+                        console.error("[AuthContext] Error fetching user data:", e);
                         setUser(null);
                     }
                 }
@@ -121,7 +104,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return userCredential.user;
         } catch (error: any) {
             console.error('Error signing up:', error);
-            throw new Error(error.message || 'Failed to sign up');
+            throw error;
         }
     };
 
@@ -132,7 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (error: any) {
             console.error('Error signing in:', error);
             setLoading(false);
-            throw new Error(error.message || 'Failed to sign in');
+            throw error;
         }
     };
 
@@ -144,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setFirebaseUser(null);
         } catch (error: any) {
             console.error('Error signing out:', error);
-            throw new Error(error.message || 'Failed to sign out');
+            throw error;
         }
     };
 

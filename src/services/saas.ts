@@ -75,6 +75,33 @@ export async function createRestaurant(
 }
 
 /**
+ * Creates a basic user profile for a customer
+ */
+export async function createCustomerProfile(
+    userId: string,
+    name: string,
+    email: string
+): Promise<void> {
+    try {
+        const userRef = doc(db, 'users', userId);
+        const userData: User = {
+            id: userId,
+            email,
+            name,
+            role: 'customer',
+            restaurantId: '', // Customers are not tied to a specific restaurant initially
+            createdAt: Timestamp.now(),
+            onboardingComplete: true,
+        };
+        await setDoc(userRef, userData);
+        console.log(`✅ Customer profile created: ${userId}`);
+    } catch (error) {
+        console.error('Error creating customer profile:', error);
+        throw new Error('Failed to create customer profile');
+    }
+}
+
+/**
  * Assigns a user to a restaurant with a specific role
  * Updates the user document with restaurantId and role
  */

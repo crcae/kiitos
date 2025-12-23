@@ -43,13 +43,13 @@ export default function Layout() {
 
                                 <RootRouteGuard />
                                 <MarketplaceCartProvider>
-                                <Stack screenOptions={{ headerShown: false }}>
-                                    <Stack.Screen name="index" />
-                                    <Stack.Screen name="login" />
-                                    <Stack.Screen name="signup" />
-                                    <Stack.Screen name="onboarding" options={{ gestureEnabled: false, headerShown: false }} />
-                                </Stack>
-                                <StatusBar style="auto" />
+                                    <Stack screenOptions={{ headerShown: false }}>
+                                        <Stack.Screen name="index" />
+                                        <Stack.Screen name="login" />
+                                        <Stack.Screen name="signup" />
+                                        <Stack.Screen name="onboarding" options={{ gestureEnabled: false, headerShown: false }} />
+                                    </Stack>
+                                    <StatusBar style="auto" />
                                 </MarketplaceCartProvider>
                             </TakeoutCartProvider>
                         </BillProvider>
@@ -83,27 +83,22 @@ function RootRouteGuard() {
         if (user) {
             // User is logged in
             const isRestaurantOwner = user.role === 'restaurant_owner';
+            const isCustomer = user.role === 'customer';
 
             if (isRestaurantOwner && !user.onboardingComplete) {
-                // Must be in onboarding
-                if (!inOnboarding) {
-                    // Check if we are already trying to go there to avoid loop?
-                    // Verify if route exists? For now assume YES as we defined it in Stack.
-                    router.replace('/onboarding');
-                }
+                if (!inOnboarding) router.replace('/onboarding');
             } else if (isRestaurantOwner && user.onboardingComplete) {
-                // Must NOT be in onboarding
-                if (inOnboarding) {
+                if (inOnboarding) router.replace('/admin');
+                if (path === '' || path === 'login' || path === 'signup') {
                     router.replace('/admin');
                 }
-                // If at root or login, go to admin
-                if (path === '' || path === 'login' || path === 'login/staff') {
-                    router.replace('/admin');
+            } else if (isCustomer) {
+                // Customers can go anywhere in (tabs)
+                if (path === 'login' || path === 'signup') {
+                    router.replace('/(tabs)/marketplace');
                 }
             } else {
-                // Staff Roles (Waiter, Cashier, Kitchen)
-
-                // 1. Protect Admin Routes: Staff cannot go to /admin
+                // Staff Roles
                 if (inAdmin) {
                     if (user.role === 'waiter') router.replace('/waiter');
                     else if (user.role === 'cashier') router.replace('/cashier');
@@ -111,17 +106,16 @@ function RootRouteGuard() {
                     return;
                 }
 
-                // 2. Redirect from Login/Root to specific dashboard
                 if (path === '' || path === 'login' || path === 'login/staff') {
-                    if (user.role === 'admin') router.replace('/admin');
-                    else if (user.role === 'waiter') router.replace('/waiter');
+                    if (user.role === 'waiter') router.replace('/waiter');
                     else if (user.role === 'cashier') router.replace('/cashier');
                     else if (user.role === 'kitchen') router.replace('/kitchen');
                 }
             }
         } else {
-            // User is NOT logged in
-            // Protected routes: admin, onboarding, waiter, cashier, kitchen
+            // User is NOT logged in (Guest Mode)
+            // Allow access to (tabs) - marketplace, profile, etc.
+            // Protect Admin & Staff routes
             if (inAdmin || inOnboarding || inWaiter || inCashier || inKitchen) {
                 router.replace('/login');
             }

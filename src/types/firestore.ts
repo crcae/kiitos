@@ -13,8 +13,11 @@ export type TenantRole = 'restaurant_owner' | 'restaurant_manager';
 // Operational Level - Day-to-day restaurant operations
 export type OperationalRole = 'waiter' | 'kitchen' | 'cashier';
 
+// Customer Level - App users
+export type CustomerRole = 'customer';
+
 // Combined role type
-export type UserRole = SaaSRole | TenantRole | OperationalRole;
+export type UserRole = SaaSRole | TenantRole | OperationalRole | CustomerRole;
 
 // Legacy alias for backward compatibility
 export type AdminRole = 'admin';
@@ -40,6 +43,9 @@ export interface User {
     restaurantId: string; // Tenant isolation - links user to their restaurant
     phoneNumber?: string;
     avatar?: string;
+    // Compatibility with Firebase User
+    displayName?: string;
+    photoURL?: string;
     createdAt: Timestamp;
     onboardingComplete?: boolean; // For restaurant owners
 }
