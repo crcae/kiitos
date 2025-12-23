@@ -43,13 +43,14 @@ export default function Layout() {
 
                                 <RootRouteGuard />
                                 <MarketplaceCartProvider>
-                                <Stack screenOptions={{ headerShown: false }}>
-                                    <Stack.Screen name="index" />
-                                    <Stack.Screen name="login" />
-                                    <Stack.Screen name="signup" />
-                                    <Stack.Screen name="onboarding" options={{ gestureEnabled: false, headerShown: false }} />
-                                </Stack>
-                                <StatusBar style="auto" />
+                                    <Stack screenOptions={{ headerShown: false }}>
+                                        <Stack.Screen name="index" />
+                                        <Stack.Screen name="login" />
+                                        <Stack.Screen name="signup" />
+                                        <Stack.Screen name="menu/[restaurantId]/[tableId]" options={{ headerShown: false }} />
+                                        <Stack.Screen name="onboarding" options={{ gestureEnabled: false, headerShown: false }} />
+                                    </Stack>
+                                    <StatusBar style="auto" />
                                 </MarketplaceCartProvider>
                             </TakeoutCartProvider>
                         </BillProvider>
