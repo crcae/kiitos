@@ -11,7 +11,7 @@ import {
     KeyboardAvoidingView,
     ScrollView
 } from 'react-native';
-import CountryPicker, { CountryCode, Country } from 'react-native-country-picker-modal';
+import { CountryPicker } from 'react-native-country-codes-picker';
 import { Smartphone, User, ChevronDown } from 'lucide-react-native';
 import { auth, db } from '../../services/firebaseConfig';
 import { PhoneAuthProvider, signInWithCredential, RecaptchaVerifier, signInWithPhoneNumber } from 'firebase/auth';
@@ -28,8 +28,8 @@ interface CustomerPhoneAuthProps {
 export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: CustomerPhoneAuthProps) {
     const { refreshUser } = useAuth();
 
-    const [countryCode, setCountryCode] = useState<CountryCode>('MX');
-    const [callingCode, setCallingCode] = useState('52');
+    const [countryCode, setCountryCode] = useState('+52');
+    const [countryFlag, setCountryFlag] = useState('🇲🇽');
     const [phone, setPhone] = useState('');
     const [code, setCode] = useState('');
     const [name, setName] = useState('');
@@ -104,11 +104,7 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
         };
     }, []);
 
-    const onSelect = (country: Country) => {
-        setCountryCode(country.cca2);
-        setCallingCode(country.callingCode[0]);
-        setShowCountryPicker(false);
-    };
+
 
     const handleSendCode = async () => {
         if (!phone || phone.length < 8) {
@@ -117,7 +113,7 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
         }
         setLoading(true);
         try {
-            const formattedPhone = `+${callingCode}${phone.replace(/\s/g, '')}`;
+            const formattedPhone = `${countryCode}${phone.replace(/\s/g, '')}`;
 
             let appVerifier;
             if (Platform.OS === 'web') {
@@ -212,7 +208,7 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
                 <Text style={styles.subtitle}>
                     {subtitle || (
                         step === 'phone' ? 'Ingresa tu número para acceder a tu perfil y pedidos.' :
-                            step === 'otp' ? `Ingresa el código de 6 dígitos enviado al +${callingCode} ${phone}.` :
+                            step === 'otp' ? `Ingresa el código de 6 dígitos enviado al ${countryCode} ${phone}.` :
                                 'Solo necesitamos tu nombre para crear tu cuenta.'
                     )}
                 </Text>
@@ -225,23 +221,8 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
                                     style={styles.countryPickerButton}
                                     onPress={() => setShowCountryPicker(true)}
                                 >
-                                    <CountryPicker
-                                        countryCode={countryCode}
-                                        withFilter
-                                        withFlag
-                                        withCallingCode
-                                        withAlphaFilter
-                                        visible={showCountryPicker}
-                                        onSelect={onSelect}
-                                        onClose={() => setShowCountryPicker(false)}
-                                        containerButtonStyle={{ display: 'none' }}
-                                    />
-                                    <CountryPicker
-                                        countryCode={countryCode}
-                                        withFlag
-                                        containerButtonStyle={{ marginRight: 4 }}
-                                    />
-                                    <Text style={styles.callingCode}>+{callingCode}</Text>
+                                    <Text style={styles.flagText}>{countryFlag}</Text>
+                                    <Text style={styles.callingCode}>{countryCode}</Text>
                                     <ChevronDown size={16} color="#6B7280" style={{ marginLeft: 4 }} />
                                 </TouchableOpacity>
 
@@ -304,6 +285,23 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
                         <View id="customer-recaptcha-container" />
                     </View>
                 )}
+
+                {/* Country Picker Modal */}
+                <CountryPicker
+                    show={showCountryPicker}
+                    pickerButtonOnPress={(item) => {
+                        setCountryCode(item.dial_code);
+                        setCountryFlag(item.flag);
+                        setShowCountryPicker(false);
+                    }}
+                    onBackdropPress={() => setShowCountryPicker(false)}
+                    style={{
+                        modal: {
+                            height: 500,
+                        },
+                    }}
+                    lang={'es'}
+                />
             </ScrollView>
         </KeyboardAvoidingView>
     );
@@ -372,6 +370,10 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '600',
         color: '#111',
+    },
+    flagText: {
+        fontSize: 24,
+        marginRight: 8,
     },
     phoneInput: {
         flex: 1,
