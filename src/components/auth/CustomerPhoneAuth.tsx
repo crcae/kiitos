@@ -84,6 +84,18 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
         };
     }, []);
 
+    // FIX: Detect if we already have a Firebase Session but no Firestore Data (New User / Interrupted Registration)
+    const { firebaseUser } = useAuth();
+    useEffect(() => {
+        if (firebaseUser && !tempFirebaseUser && !name) {
+            // We are mounted, which means !user (no Firestore doc). 
+            // But we have a firebaseUser, so we must be a new user needing a name.
+            console.log("🔄 Detecting active session without profile. Resuming registration...");
+            setTempFirebaseUser(firebaseUser);
+            setStep('name');
+        }
+    }, [firebaseUser]);
+
     const handleNativeRecaptchaMessage = (event: any) => {
         try {
             const data = JSON.parse(event.nativeEvent.data);
