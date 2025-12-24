@@ -1,195 +1,153 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, SafeAreaView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { createRestaurant, completeOnboarding } from '../../src/services/saas';
-import { Ionicons } from '@expo/vector-icons';
-
-// Steps: 1. Subscription, 2. Setup (Name)
-const STEPS = ['Plan', 'Configuración'];
+import { updateRestaurantSubscription, completeOnboarding } from '../../src/services/saas';
+import { simulateSuccessfulPayment } from '../../src/services/stripe';
+import { SubscriptionPlan } from '../../src/types/firestore';
+import { CreditCard, CheckCircle, Shield, ArrowRight } from 'lucide-react-native';
 
 export default function OnboardingWizard() {
     const router = useRouter();
-    const { user, firebaseUser, refreshUser } = useAuth();
-    const [currentStep, setCurrentStep] = useState(0);
+    const { user, refreshUser } = useAuth();
     const [loading, setLoading] = useState(false);
-
-    // Subscription State
     const [selectedPlan, setSelectedPlan] = useState<'starter' | 'professional' | 'enterprise'>('starter');
-    const [isSubscribed, setIsSubscribed] = useState(false);
 
-    // Data State
-    const [restaurantName, setRestaurantName] = useState('');
-
-    // --- Actions ---
-
-    const handleNext = () => {
-        if (currentStep === 0) {
-            if (!isSubscribed) {
-                Alert.alert('Pago requerido', 'Por favor suscríbete a un plan para continuar.');
-                return;
-            }
-            setCurrentStep(1);
-        }
-    };
+    // Load initial plan from user's restaurant logic if possible, or default
+    // For now we default to what they might have selected or just 'starter' and let them confirm.
 
     const handleSubscribe = async () => {
-        setLoading(true);
-        // Simulate Stripe delay
-        setTimeout(() => {
-            setLoading(false);
-            setIsSubscribed(true);
-            Alert.alert('¡Pago Exitoso!', 'Tu suscripción ha sido activada (Simulación).');
-        }, 2000);
-    };
-
-    const handleFinish = async () => {
-        if (!restaurantName.trim()) {
-            Alert.alert('Falta información', 'Por favor ingresa el nombre de tu restaurante.');
+        if (!user || user.role !== 'restaurant_owner' || !user.restaurantId) {
+            Alert.alert('Error', 'No se encontró la información del restaurante. Por favor inicia sesión nuevamente.');
             return;
         }
 
-        if (!user || !firebaseUser) return;
-
         setLoading(true);
         try {
-            // 1. Create Restaurant with Defaults
-            console.log("Creating restaurant...");
-            // createRestaurant implicitly sets default settings if not provided in detail
-            const restaurantId = await createRestaurant(user.id, user.email, selectedPlan);
+            // 1. Simulate Payment
+            console.log('💳 Processing payment...');
+            const paymentResult = await simulateSuccessfulPayment(
+                selectedPlan,
+                user.email
+            );
 
-            // Note: We are skipping Logo upload and Menu creation as requested.
-            // The restaurant will start with default branding (Kiitos Orange) and empty menu.
-            // Using "Kiitos Orange" #EA580C as default is handled in createRestaurant or the UI default.
+            if (!paymentResult.success) {
+                throw new Error('El pago no pudo ser procesado.');
+            }
 
-            // 2. Complete Onboarding
-            console.log("Completing onboarding...");
-            await completeOnboarding(restaurantId, user.id);
+            // 2. Update Subscription Status
+            console.log('🔄 Updating subscription...');
+            await updateRestaurantSubscription(user.restaurantId, selectedPlan, 'active');
 
-            // 3. Force Context Refresh
-            console.log("Refreshing user context...");
+            // 3. Mark Onboarding as Complete
+            console.log('✅ Completing onboarding...');
+            await completeOnboarding(user.restaurantId, user.id);
             await refreshUser();
 
-            setLoading(false);
-
-            // 4. Redirect Immediately
-            router.replace('/admin');
+            // 4. Redirect
+            Alert.alert('¡Bienvenido!', 'Tu suscripción está activa.', [
+                { text: 'Ir al Panel', onPress: () => router.replace('/admin') }
+            ]);
 
         } catch (error: any) {
-            console.error(error);
+            console.error('Onboarding Error:', error);
+            Alert.alert('Error', error.message || 'Hubo un problema al procesar tu suscripción.');
+        } finally {
             setLoading(false);
-            Alert.alert('Error', 'Hubo un problema configurando tu cuenta: ' + error.message);
         }
     };
 
-
-    // --- Render Steps ---
-
-    const renderStepIndicator = () => (
-        <View className="flex-row justify-center mb-8">
-            {STEPS.map((step, index) => (
-                <View key={index} className="flex-row items-center">
-                    <View className={`w-8 h-8 rounded-full items-center justify-center ${index <= currentStep ? 'bg-orange-500' : 'bg-gray-200'}`}>
-                        <Text className={`text-xs font-bold ${index <= currentStep ? 'text-white' : 'text-gray-500'}`}>
-                            {index + 1}
-                        </Text>
-                    </View>
-                    {index < STEPS.length - 1 && (
-                        <View className={`w-12 h-1 ${index < currentStep ? 'bg-orange-500' : 'bg-gray-200'}`} />
-                    )}
-                </View>
-            ))}
-        </View>
-    );
-
-    const renderStep1_Subscription = () => (
-        <View>
-            <Text className="text-2xl font-bold text-gray-800 mb-2">Elige tu Plan</Text>
-            <Text className="text-gray-500 mb-6">Selecciona el plan que mejor se adapte a tu negocio.</Text>
-
-            {/* Plan Cards */}
-            <TouchableOpacity
-                onPress={() => setSelectedPlan('starter')}
-                className={`p-4 rounded-xl border-2 mb-4 ${selectedPlan === 'starter' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-white'}`}
-            >
-                <View className="flex-row justify-between items-center mb-2">
-                    <Text className="font-bold text-lg">Básico</Text>
-                    <Text className="font-bold text-xl">$29/mes</Text>
-                </View>
-                <Text className="text-gray-600">Ideal para restaurantes pequeños. Hasta 300 pedidos/mes.</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-                onPress={() => setSelectedPlan('professional')}
-                className={`p-4 rounded-xl border-2 mb-8 ${selectedPlan === 'professional' ? 'border-orange-500 bg-orange-50' : 'border-gray-200 bg-white'}`}
-            >
-                <View className="flex-row justify-between items-center mb-2">
-                    <Text className="font-bold text-lg">Pro</Text>
-                    <Text className="font-bold text-xl">$79/mes</Text>
-                </View>
-                <Text className="text-gray-600">Para restaurantes en crecimiento. Pedidos ilimitados y analíticas.</Text>
-            </TouchableOpacity>
-
-            {!isSubscribed ? (
-                <TouchableOpacity
-                    onPress={handleSubscribe}
-                    disabled={loading}
-                    className="w-full bg-gray-900 py-4 rounded-xl items-center flex-row justify-center"
-                >
-                    {loading ? <ActivityIndicator color="#FFF" className="mr-2" /> : <Ionicons name="card-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />}
-                    <Text className="text-white font-bold text-lg">Suscribirse y Pagar</Text>
-                </TouchableOpacity>
-            ) : (
-                <View>
-                    <View className="bg-green-100 p-4 rounded-lg mb-6 flex-row items-center">
-                        <Ionicons name="checkmark-circle" size={24} color="#166534" />
-                        <Text className="text-green-800 ml-2 font-medium">Suscripción Activa</Text>
-                    </View>
-                    <TouchableOpacity
-                        onPress={handleNext}
-                        className="w-full bg-orange-500 py-4 rounded-xl items-center"
-                    >
-                        <Text className="text-white font-bold text-lg">Continuar</Text>
-                    </TouchableOpacity>
-                </View>
-            )}
-        </View>
-    );
-
-    const renderStep2_Setup = () => (
-        <View>
-            <Text className="text-2xl font-bold text-gray-800 mb-2">Configuración Básica</Text>
-            <Text className="text-gray-500 mb-6">Solo necesitamos el nombre de tu restaurante para empezar.</Text>
-
-            <View className="mb-8">
-                <Text className="text-gray-700 font-medium mb-1">Nombre del Restaurante</Text>
-                <TextInput
-                    className="w-full bg-white border border-gray-300 rounded-lg px-4 py-3"
-                    placeholder="Ej. La Trattoria"
-                    value={restaurantName}
-                    onChangeText={setRestaurantName}
-                />
-            </View>
-
-            <TouchableOpacity
-                onPress={handleFinish}
-                disabled={loading}
-                className="w-full bg-orange-500 py-4 rounded-xl items-center flex-row justify-center"
-            >
-                {loading && <ActivityIndicator color="#FFF" className="mr-2" />}
-                <Text className="text-white font-bold text-lg">Crear Restaurante</Text>
-            </TouchableOpacity>
-        </View>
-    );
+    const plans = [
+        { id: 'starter', name: 'Starter', price: '$49', features: ['Hasta 10 mesas', '3 usuarios'] },
+        { id: 'professional', name: 'Professional', price: '$99', features: ['Hasta 30 mesas', 'Usuarios ilimitados'] },
+        { id: 'enterprise', name: 'Enterprise', price: 'Custom', features: ['Mesas ilimitadas', 'Soporte 24/7'] },
+    ];
 
     return (
         <SafeAreaView className="flex-1 bg-gray-50">
-            <View className="flex-1 px-6 py-10">
-                {renderStepIndicator()}
+            <View className="flex-1 px-6 py-10 max-w-3xl mx-auto w-full">
+                {/* Header */}
+                <View className="mb-10 items-center">
+                    <View className="bg-kiitos-orange/10 p-3 rounded-full mb-4">
+                        <CreditCard size={32} color="#f89219" />
+                    </View>
+                    <Text className="text-3xl font-bold text-kiitos-black mb-2 text-center">
+                        Completa tu Suscripción
+                    </Text>
+                    <Text className="text-gray-500 text-center max-w-md">
+                        Estás a un paso de activar tu restaurante. Confirma tu plan y realiza el pago seguro a continuación.
+                    </Text>
+                </View>
 
-                <ScrollView showsVerticalScrollIndicator={false}>
-                    {currentStep === 0 && renderStep1_Subscription()}
-                    {currentStep === 1 && renderStep2_Setup()}
+                <ScrollView showsVerticalScrollIndicator={false} className="flex-1">
+                    {/* Plan Selection */}
+                    <Text className="text-lg font-bold text-kiitos-black mb-4">Confirma tu Plan</Text>
+
+                    <View className="space-y-4 mb-8">
+                        {plans.map((plan) => (
+                            <TouchableOpacity
+                                key={plan.id}
+                                onPress={() => setSelectedPlan(plan.id as SubscriptionPlan)}
+                                className={`p-4 rounded-xl border-2 flex-row justify-between items-center transition-all ${selectedPlan === plan.id
+                                        ? 'border-kiitos-orange bg-orange-50'
+                                        : 'border-gray-200 bg-white'
+                                    }`}
+                            >
+                                <View>
+                                    <Text className={`font-bold text-base ${selectedPlan === plan.id ? 'text-kiitos-orange' : 'text-gray-800'}`}>
+                                        {plan.name}
+                                    </Text>
+                                    <Text className="text-gray-500 text-xs">{plan.features.join(' • ')}</Text>
+                                </View>
+                                <View className="flex-row items-center space-x-3">
+                                    <Text className="font-bold text-lg text-kiitos-black">{plan.price}</Text>
+                                    <View className={`w-6 h-6 rounded-full border-2 items-center justify-center ${selectedPlan === plan.id ? 'border-kiitos-orange bg-kiitos-orange' : 'border-gray-300'
+                                        }`}>
+                                        {selectedPlan === plan.id && <CheckCircle size={14} color="white" />}
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    {/* Payment Summary */}
+                    <View className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm mb-8">
+                        <View className="flex-row justify-between mb-2">
+                            <Text className="text-gray-500">Subtotal</Text>
+                            <Text className="font-medium text-gray-900">{plans.find(p => p.id === selectedPlan)?.price}</Text>
+                        </View>
+                        <View className="flex-row justify-between mb-4">
+                            <Text className="text-gray-500">Impuestos (16%)</Text>
+                            <Text className="font-medium text-gray-900">$0.00 (Incluidos)</Text>
+                        </View>
+                        <View className="border-t border-gray-100 pt-4 flex-row justify-between items-center">
+                            <Text className="text-lg font-bold text-kiitos-black">Total a Pagar</Text>
+                            <Text className="text-2xl font-bold text-kiitos-orange">{plans.find(p => p.id === selectedPlan)?.price}</Text>
+                        </View>
+                    </View>
+
+                    {/* Security Note */}
+                    <View className="flex-row items-center justify-center space-x-2 mb-8">
+                        <Shield size={16} color="#10B981" />
+                        <Text className="text-gray-500 text-xs">Pagos procesados de forma segura vía Stripe</Text>
+                    </View>
+
+                    {/* Action Button */}
+                    <TouchableOpacity
+                        onPress={handleSubscribe}
+                        disabled={loading}
+                        className={`w-full py-4 rounded-xl items-center flex-row justify-center space-x-2 shadow-lg shadow-kiitos-orange/20 ${loading ? 'bg-kiitos-orange/70' : 'bg-kiitos-orange hover:bg-orange-600'
+                            }`}
+                    >
+                        {loading ? (
+                            <ActivityIndicator color="#FFF" />
+                        ) : (
+                            <>
+                                <Text className="text-white font-bold text-lg">Pagar y Activar</Text>
+                                <ArrowRight color="white" size={20} />
+                            </>
+                        )}
+                    </TouchableOpacity>
                 </ScrollView>
             </View>
         </SafeAreaView>

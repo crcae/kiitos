@@ -2,20 +2,24 @@ import React, { useState } from 'react';
 import {
     View,
     Text,
-    StyleSheet,
     TextInput,
     TouchableOpacity,
     ScrollView,
     Alert,
-    ActivityIndicator
+    ActivityIndicator,
+    Image,
+    KeyboardAvoidingView,
+    Platform,
+    ImageBackground
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useTenant } from '../../src/context/TenantContext';
+import { Mail, Lock, ArrowRight, CheckCircle, ChefHat } from 'lucide-react-native';
 
 export default function LoginPage() {
     const router = useRouter();
-    const { signIn, user, loading: authLoading } = useAuth(); // Get user and authLoading
+    const { signIn, user, loading: authLoading } = useAuth();
     const { restaurant } = useTenant();
 
     const [email, setEmail] = useState('');
@@ -42,7 +46,7 @@ export default function LoginPage() {
 
     const handleLogin = async () => {
         if (!email || !password) {
-            Alert.alert('Error', 'Por favor ingresa tu email y contraseña');
+            Alert.alert('Datos incompletos', 'Por favor ingresa tu correo corporativo y contraseña.');
             return;
         }
 
@@ -55,186 +59,184 @@ export default function LoginPage() {
         } catch (error: any) {
             console.error('Login error:', error);
             Alert.alert(
-                'Error al Iniciar Sesión',
-                'Email o contraseña incorrectos. Por favor verifica tus datos.'
+                'Acceso Denegado',
+                'Las credenciales no coinciden con nuestros registros. Intenta nuevamente.'
             );
             setLoading(false);
         }
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                >
-                    <Text style={styles.backButtonText}>← Volver</Text>
-                </TouchableOpacity>
-                <Text style={styles.title}>Bienvenido</Text>
-                <Text style={styles.subtitle}>
-                    Inicia sesión para gestionar tu restaurante
-                </Text>
-            </View>
+        <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            className="flex-1 bg-white"
+        >
+            <View className="flex-1 flex-col md:flex-row">
 
-            {/* Form */}
-            <View style={styles.form}>
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Email</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="juan@restaurante.com"
-                        value={email}
-                        onChangeText={setEmail}
-                        autoCapitalize="none"
-                        keyboardType="email-address"
-                        editable={!loading}
+                {/* LEFT SIDE - Brand & Inspiration (Hidden on Mobile, Visible on Tablet/Web) */}
+                <View className="hidden md:flex md:w-1/2 relative bg-kiitos-black">
+                    <Image
+                        source={{ uri: 'https://images.unsplash.com/photo-1556910103-1c02745a30bf?q=80&w=2070&auto=format&fit=crop' }}
+                        className="absolute inset-0 w-full h-full opacity-60"
+                        resizeMode="cover"
                     />
+                    <View className="absolute inset-0 bg-gradient-to-br from-kiitos-orange/90 to-kiitos-black/80" />
+
+                    <View className="relative z-10 flex-1 justify-between p-16">
+                        {/* Logo */}
+                        <View>
+                            <Text className="text-white font-bold text-3xl tracking-tight">
+                                Kiitos<Text className="text-kiitos-orange">.</Text>
+                            </Text>
+                            <View className="mt-2 inline-flex flex-row items-center space-x-2 bg-white/10 px-3 py-1 rounded-full self-start border border-white/20">
+                                <ChefHat size={14} color="white" />
+                                <Text className="text-white text-xs font-medium uppercase tracking-wider">ADMIN ACCESS PORTAL</Text>
+                            </View>
+                        </View>
+
+                        {/* Quote/Testimonial */}
+                        <View>
+                            <Text className="text-3xl font-bold text-white leading-tight mb-6">
+                                "La eficiencia en la cocina empieza con las herramientas correctas."
+                            </Text>
+                            <View className="space-y-4">
+                                <View className="flex-row items-center space-x-3">
+                                    <CheckCircle size={20} color="#10B981" />
+                                    <Text className="text-white/90 text-lg">Control total de pedidos en tiempo real</Text>
+                                </View>
+                                <View className="flex-row items-center space-x-3">
+                                    <CheckCircle size={20} color="#10B981" />
+                                    <Text className="text-white/90 text-lg">Métricas de rendimiento personalizadas</Text>
+                                </View>
+                                <View className="flex-row items-center space-x-3">
+                                    <CheckCircle size={20} color="#10B981" />
+                                    <Text className="text-white/90 text-lg">Comunicación fluida entre sala y cocina</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <View>
+                            <Text className="text-white/60 text-sm">© 2025 Kiitos Inc. Restaurant OS.</Text>
+                        </View>
+                    </View>
                 </View>
 
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Contraseña</Text>
-                    <TextInput
-                        style={styles.input}
-                        placeholder="Ingresa tu contraseña"
-                        value={password}
-                        onChangeText={setPassword}
-                        secureTextEntry
-                        editable={!loading}
-                    />
+                {/* RIGHT SIDE - Login Form */}
+                <View className="flex-1 bg-white justify-center">
+                    <ScrollView
+                        contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+                        className="flex-1"
+                    >
+                        <View className="flex-1 justify-center px-6 py-12 md:px-20 lg:px-32 max-w-2xl mx-auto w-full">
+
+                            {/* Mobile Header (Visible only on mobile) */}
+                            <View className="md:hidden mb-10 flex-row justify-between items-center">
+                                <Text className="text-kiitos-black font-bold text-2xl tracking-tight">
+                                    Kiitos<Text className="text-kiitos-orange">.</Text>
+                                </Text>
+                                <TouchableOpacity onPress={() => router.back()}>
+                                    <Text className="text-gray-500">Atrás</Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Back Button (Desktop) */}
+                            <TouchableOpacity
+                                onPress={() => router.back()}
+                                className="hidden md:flex self-start mb-8 flex-row items-center space-x-2 group"
+                            >
+                                <ArrowRight size={16} className="text-gray-400 rotate-180 group-hover:text-kiitos-orange" color="#9CA3AF" />
+                                <Text className="text-gray-400 font-medium group-hover:text-kiitos-orange transition-colors">Volver al inicio</Text>
+                            </TouchableOpacity>
+
+                            {/* Form Header */}
+                            <View className="mb-10">
+                                <Text className="text-3xl md:text-4xl font-bold text-kiitos-black mb-3">
+                                    Bienvenido a tu Panel
+                                </Text>
+                                <Text className="text-lg text-gray-500">
+                                    Ingresa tus credenciales para gestionar tu restaurante y métricas.
+                                </Text>
+                            </View>
+
+                            {/* Inputs */}
+                            <View className="space-y-6">
+                                <View>
+                                    <Text className="text-sm font-semibold text-kiitos-black mb-2 ml-1">Correo Corporativo</Text>
+                                    <View className="flex-row items-center border border-gray-200 rounded-xl px-4 py-3.5 bg-gray-50 focus:bg-white focus:border-kiitos-orange transition-all">
+                                        <Mail color="#9CA3AF" size={20} />
+                                        <TextInput
+                                            className="flex-1 ml-3 text-base text-gray-900"
+                                            placeholder="nombre@restaurante.com"
+                                            placeholderTextColor="#9CA3AF"
+                                            value={email}
+                                            onChangeText={setEmail}
+                                            autoCapitalize="none"
+                                            keyboardType="email-address"
+                                            editable={!loading}
+                                        />
+                                    </View>
+                                </View>
+
+                                <View>
+                                    <View className="flex-row justify-between items-center mb-2 ml-1">
+                                        <Text className="text-sm font-semibold text-kiitos-black">Contraseña</Text>
+                                    </View>
+                                    <View className="flex-row items-center border border-gray-200 rounded-xl px-4 py-3.5 bg-gray-50 focus:bg-white focus:border-kiitos-orange transition-all">
+                                        <Lock color="#9CA3AF" size={20} />
+                                        <TextInput
+                                            className="flex-1 ml-3 text-base text-gray-900"
+                                            placeholder="••••••••••••"
+                                            placeholderTextColor="#9CA3AF"
+                                            value={password}
+                                            onChangeText={setPassword}
+                                            secureTextEntry
+                                            editable={!loading}
+                                        />
+                                    </View>
+                                </View>
+                            </View>
+
+                            <View className="flex-row justify-end mt-2 mb-6">
+                                <TouchableOpacity onPress={() => Alert.alert('Recuperar Contraseña', 'Contacta a tu administrador para restablecer tu acceso.')}>
+                                    <Text className="text-sm font-medium text-kiitos-orange hover:text-orange-700">
+                                        ¿Olvidaste tu contraseña?
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Action Button */}
+                            <TouchableOpacity
+                                className={`bg-kiitos-orange py-4 rounded-xl shadow-lg shadow-kiitos-orange/30 flex-row justify-center items-center space-x-2 ${loading ? 'opacity-70' : 'hover:bg-orange-600 active:scale-[0.98]'
+                                    } transition-all`}
+                                onPress={handleLogin}
+                                disabled={loading}
+                            >
+                                {loading ? (
+                                    <ActivityIndicator color="#FFFFFF" />
+                                ) : (
+                                    <>
+                                        <Text className="text-white font-bold text-lg">Iniciar Sesión</Text>
+                                        <ArrowRight color="white" size={20} strokeWidth={2.5} />
+                                    </>
+                                )}
+                            </TouchableOpacity>
+
+                            {/* Footer / Helper */}
+                            <View className="mt-12 pt-6 border-t border-gray-100 flex-row justify-center">
+                                <Text className="text-gray-500 text-sm">
+                                    ¿No tienes credenciales?{' '}
+                                </Text>
+                                <TouchableOpacity onPress={() => router.push('/(auth)/register' as any)}>
+                                    <Text className="text-kiitos-orange font-bold text-sm">
+                                        Registra tu restaurante
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+
+                        </View>
+                    </ScrollView>
                 </View>
-
-                <TouchableOpacity
-                    style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                    onPress={handleLogin}
-                    disabled={loading}
-                >
-                    {loading ? (
-                        <ActivityIndicator color="#FFFFFF" />
-                    ) : (
-                        <Text style={styles.submitButtonText}>Iniciar Sesión</Text>
-                    )}
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                    style={styles.forgotPassword}
-                    onPress={() => Alert.alert('Recuperar Contraseña', 'Funcionalidad próximamente.')}
-                >
-                    <Text style={styles.forgotPasswordText}>¿Olvidaste tu contraseña?</Text>
-                </TouchableOpacity>
             </View>
-
-            {/* Signup Link */}
-            <View style={styles.signupContainer}>
-                <Text style={styles.signupText}>¿No tienes cuenta? </Text>
-                <TouchableOpacity onPress={() => router.push('/signup' as any)}>
-                    <Text style={styles.signupLink}>Regístrate aquí</Text>
-                </TouchableOpacity>
-            </View>
-        </ScrollView>
+        </KeyboardAvoidingView>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#FDFBF7',
-    },
-    contentContainer: {
-        paddingBottom: 40,
-    },
-
-    // Header
-    header: {
-        paddingHorizontal: 20,
-        paddingVertical: 40,
-        backgroundColor: '#2C3E50',
-    },
-    backButton: {
-        marginBottom: 20,
-    },
-    backButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-    },
-    title: {
-        fontSize: 36,
-        fontWeight: 'bold',
-        color: '#FFFFFF',
-        marginBottom: 8,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#E0E0E0',
-    },
-
-    // Form
-    form: {
-        paddingHorizontal: 20,
-        paddingVertical: 40,
-        maxWidth: 500,
-        width: '100%',
-        alignSelf: 'center',
-    },
-    inputGroup: {
-        marginBottom: 24,
-    },
-    label: {
-        fontSize: 14,
-        fontWeight: '600',
-        color: '#2C3E50',
-        marginBottom: 8,
-    },
-    input: {
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: '#E0E0E0',
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 16,
-        color: '#2C3E50',
-    },
-    submitButton: {
-        backgroundColor: '#FF385C',
-        paddingVertical: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-        marginTop: 16,
-    },
-    submitButtonDisabled: {
-        opacity: 0.6,
-    },
-    submitButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-    forgotPassword: {
-        alignItems: 'center',
-        marginTop: 16,
-    },
-    forgotPasswordText: {
-        color: '#666',
-        fontSize: 14,
-    },
-
-    // Signup Link
-    signupContainer: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        paddingHorizontal: 20,
-        marginTop: 20,
-    },
-    signupText: {
-        fontSize: 14,
-        color: '#666',
-    },
-    signupLink: {
-        fontSize: 14,
-        color: '#E67E22',
-        fontWeight: '600',
-        textDecorationLine: 'underline',
-    },
-});
