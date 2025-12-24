@@ -37,7 +37,7 @@
       ]
     },
     "web": {
-      "favicon": "./public/favicon.png",
+      "favicon": "https://8dbd0d43b3a9a42f30202af2bdde13f8.cdn.bubble.io/f1766605835600x878908652895837800/KITOS%20LOGO-ANDROID.png?_gl=1*i4a7hs*_gcl_au*MzAwNDQ2OTA5LjE3NjY0MjIzNzg.*_ga*MTI5MTI4ODI3Ny4xNzEyODU1NDE4*_ga_BFPVR2DEE2*czE3NjY1OTM1NjMkbzQzOSRnMSR0MTc2NjYwNTgxMSRqNDkkbDAkaDA.",
       "output": "static",
       "name": "Kitos",
       "description": "Tu comida favorita, al instante. Conecta con los mejores restaurantes locales.",
