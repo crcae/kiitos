@@ -37,8 +37,12 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png",
-      "output": "static"
+      "favicon": "./public/favicon.png",
+      "output": "static",
+      "name": "Kitos",
+      "description": "Tu comida favorita, al instante. Conecta con los mejores restaurantes locales.",
+      "themeColor": "#F97316",
+      "display": "standalone"
     },
     "plugins": [
       "expo-router",
