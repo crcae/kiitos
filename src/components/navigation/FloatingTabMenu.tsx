@@ -1,30 +1,47 @@
 import React from 'react';
 import { View, TouchableOpacity, Platform, StyleSheet } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
-import { ShoppingBag, ScanLine, User } from 'lucide-react-native';
+import { Utensils, ScanLine, User } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useMarketStore } from '../../store/marketStore';
 
 export function FloatingTabMenu(props: any) {
     const router = useRouter();
     const pathname = usePathname();
-    const { triggerAction } = useMarketStore();
+    const { triggerAction, currentMode } = useMarketStore();
     const isIOS = Platform.OS === 'ios';
+
+    // HIDE on sub-pages (only show on main market/scan/profile screens)
+    // pathname can be "/marketplace", "/profile", or the root "/"
+    const isMainTab = pathname === '/(app)/marketplace' ||
+        pathname === '/marketplace' ||
+        pathname === '/(app)/profile' ||
+        pathname === '/profile' ||
+        pathname === '/';
+
+    if (!isMainTab) return null;
 
     // Determine active tab based on router state OR current pathname
     let activeTab = 'marketplace';
 
     if (props.state && props.state.routes) {
         const routeName = props.state.routes[props.state.index].name;
-        if (routeName === 'profile') activeTab = 'profile';
-        else if (routeName === 'marketplace') activeTab = 'marketplace';
+        if (routeName.includes('profile')) {
+            activeTab = 'profile';
+        } else if (routeName.includes('marketplace')) {
+            activeTab = currentMode === 'SCAN' ? 'scan' : 'marketplace';
+        }
     } else {
-        if (pathname.includes('profile')) activeTab = 'profile';
-        // Note: marketplace is default
+        if (pathname.includes('profile')) {
+            activeTab = 'profile';
+        } else if (pathname.includes('marketplace')) {
+            activeTab = currentMode === 'SCAN' ? 'scan' : 'marketplace';
+        }
     }
 
     const handlePress = (tab: 'marketplace' | 'scan' | 'profile') => {
         // PRESERVED LOGIC: Sync with MarketStore for UI transitions
+        // NO DELAYS: Triggering actions and navigation immediately
         switch (tab) {
             case 'marketplace':
                 triggerAction('SCROLL_DOWN');
@@ -52,30 +69,31 @@ export function FloatingTabMenu(props: any) {
                 style={[styles.container, containerStyle]}
             >
                 {/* Marketplace Action */}
-                <TouchableOpacity onPress={() => handlePress('marketplace')}>
-                    <ShoppingBag
+                <TouchableOpacity activeOpacity={0.7} onPress={() => handlePress('marketplace')}>
+                    <Utensils
                         size={24}
-                        color={activeTab === 'marketplace' ? '#000000' : '#9CA3AF'}
+                        color={activeTab === 'marketplace' ? '#F97316' : '#9CA3AF'}
                         strokeWidth={activeTab === 'marketplace' ? 2.5 : 2}
                     />
                 </TouchableOpacity>
 
                 {/* Scan Action (Middle) */}
                 <TouchableOpacity
+                    activeOpacity={0.7}
                     onPress={() => handlePress('scan')}
                     style={[
                         styles.scanButton,
-                        { backgroundColor: activeTab === 'scan' ? '#EA580C' : '#E5E7EB' }
+                        { backgroundColor: activeTab === 'scan' ? '#F97316' : '#E5E7EB' }
                     ]}
                 >
                     <ScanLine size={28} color={activeTab === 'scan' ? 'white' : '#9CA3AF'} />
                 </TouchableOpacity>
 
                 {/* Profile Action */}
-                <TouchableOpacity onPress={() => handlePress('profile')}>
+                <TouchableOpacity activeOpacity={0.7} onPress={() => handlePress('profile')}>
                     <User
                         size={24}
-                        color={activeTab === 'profile' ? '#000000' : '#9CA3AF'}
+                        color={activeTab === 'profile' ? '#F97316' : '#9CA3AF'}
                         strokeWidth={activeTab === 'profile' ? 2.5 : 2}
                     />
                 </TouchableOpacity>

@@ -59,8 +59,8 @@ export default function OnboardingWizard() {
             const restaurantId = await createRestaurant(user.id, user.email, selectedPlan);
 
             // Note: We are skipping Logo upload and Menu creation as requested.
-            // The restaurant will start with default branding (Kiitos Orange) and empty menu.
-            // Using "Kiitos Orange" #EA580C as default is handled in createRestaurant or the UI default.
+            // The restaurant will start with default branding (Kitos Orange) and empty menu.
+            // Using "Kitos Orange" #EA580C as default is handled in createRestaurant or the UI default.
 
             // 2. Complete Onboarding
             console.log("Completing onboarding...");

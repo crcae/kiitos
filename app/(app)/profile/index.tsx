@@ -64,10 +64,18 @@ export default function ProfileScreen() {
 
                     {/* DYNAMIC HEADER */}
                     <View style={styles.header}>
-                        <Image
-                            source={{ uri: user.avatar || (firebaseUser as any)?.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || user.email || 'User')}&background=F97316&color=fff` }}
-                            style={styles.avatar}
-                        />
+                        {user.avatar || (firebaseUser as any)?.photoURL ? (
+                            <Image
+                                source={{ uri: user.avatar || (firebaseUser as any)?.photoURL }}
+                                style={styles.avatar}
+                            />
+                        ) : (
+                            <View style={styles.initialsAvatar}>
+                                <Text style={styles.initialsText}>
+                                    {(user.name || (firebaseUser as any)?.displayName || user.email || 'U').charAt(0).toUpperCase()}
+                                </Text>
+                            </View>
+                        )}
                         <Text style={styles.name}>{user.name || (firebaseUser as any)?.displayName || "Valued Customer"}</Text>
                         <Text style={styles.email}>{user.email}</Text>
                     </View>
@@ -192,4 +200,6 @@ const styles = StyleSheet.create({
     divider: { height: 1, backgroundColor: '#F3F4F6', marginLeft: 74 },
     logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 20, opacity: 0.8 },
     logoutText: { color: '#EF4444', fontWeight: '600', fontSize: 16, marginLeft: 10 },
+    initialsAvatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#E5E7EB', justifyContent: 'center', alignItems: 'center', marginBottom: 15, borderWidth: 4, borderColor: '#fff' },
+    initialsText: { fontSize: 40, fontWeight: '700', color: '#6B7280' },
 });
