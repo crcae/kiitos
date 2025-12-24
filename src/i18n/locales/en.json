@@ -1,0 +1,78 @@
+{
+    "landing": {
+        "welcome": "Welcome to Kitos",
+        "login": "Log In",
+        "signup": "Sign Up",
+        "toggle_lang": "Cambiar a Español"
+    },
+    "nav": {
+        "for_restaurants": "For Restaurants",
+        "go_to_dashboard": "Go to Dashboard ({{name}})",
+        "dashboard": "Dashboard",
+        "login": "Log In",
+        "signup": "Get Started"
+    },
+    "hero": {
+        "badge": "The Future of Dining Payment",
+        "title_start": "The Fastest Way to Pay at",
+        "title_highlight": "Restaurants",
+        "description": "Scan, Split, and Pay in 10 seconds. No waiting for the bill, no app download required. Seamless integration for modern dining.",
+        "btn_restaurants": "For Restaurants",
+        "btn_diners": "For Diners",
+        "feat_no_app": "No App Download",
+        "feat_instant": "Instant Setup",
+        "stats_label": "Avg. Payment Time",
+        "stats_value": "10 Seconds"
+    },
+    "how_it_works": {
+        "badge": "Seamless Experience",
+        "title": "How it Works",
+        "step1_title": "Scan the QR",
+        "step1_desc": "Simply scan the QR code at your table with your phone camera. No apps to download or accounts to create.",
+        "step2_title": "Split the Bill",
+        "step2_desc": "Pay just your share or treat your friends. Custom split options make group dining effortless and fair.",
+        "step3_title": "Leave in Seconds",
+        "step3_desc": "Payment is instant. No waiting for card machines or paper receipts. Just pay and go."
+    },
+    "restaurants": {
+        "badge": "For Restaurants",
+        "title_start": "Run your restaurant",
+        "title_highlight": "faster & smarter.",
+        "feat1_title": "Turn Tables 15 Minutes Faster",
+        "feat1_desc": "Eliminate the 15-minute average wait for the bill, allowing you to serve more guests per shift.",
+        "feat2_title": "40% More Tips for Staff",
+        "feat2_desc": "Pre-calculated tip options and seamless digital payments encourage higher gratuity for your team.",
+        "feat3_title": "Click & Collect Included",
+        "feat3_desc": "Diversify revenue streams with built-in pickup and ordering capabilities managed from one dashboard."
+    },
+    "diners": {
+        "badge": "For Diners",
+        "title": "The Best Dining Experience",
+        "feat1_title": "Apple Pay & Google Pay",
+        "feat1_desc": "Integrated for one-tap secure checkout.",
+        "feat2_title": "Digital Receipts",
+        "feat2_desc": "Instantly emailed or saved to your gallery.",
+        "feat3_title": "No Account Needed",
+        "feat3_desc": "Guest checkout is the default standard.",
+        "feat4_title": "Loyalty Points",
+        "feat4_desc": "Earn rewards automatically with every scan."
+    },
+    "social": {
+        "users": "HAPPY USERS",
+        "restaurants": "RESTAURANTS",
+        "secure": "SECURE PAYMENTS"
+    },
+    "footer": {
+        "description": "The operating system for modern restaurants. Speed, efficiency, and better dining experiences.",
+        "title_product": "Product",
+        "title_company": "Company",
+        "request_demo": "Request Demo",
+        "about": "About Us",
+        "careers": "Careers",
+        "blog": "Blog",
+        "contact": "Contact",
+        "copyright": "© 2026 Kitos Inc. All rights reserved.",
+        "privacy": "Privacy Policy",
+        "terms": "Terms of Service"
+    }
+}
