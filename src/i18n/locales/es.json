@@ -1,0 +1,78 @@
+{
+    "landing": {
+        "welcome": "Bienvenido a Kitos",
+        "login": "Iniciar Sesión",
+        "signup": "Crear Cuenta",
+        "toggle_lang": "Switch to English"
+    },
+    "nav": {
+        "for_restaurants": "Para Restaurantes",
+        "go_to_dashboard": "Ir al Panel ({{name}})",
+        "dashboard": "Panel de Control",
+        "login": "Iniciar Sesión",
+        "signup": "Comenzar"
+    },
+    "hero": {
+        "badge": "El Futuro del Pago en Restaurantes",
+        "title_start": "La forma más rápida de pagar en",
+        "title_highlight": "Restaurantes",
+        "description": "Escanea, Divide y Paga en 10 segundos. Sin esperas por la cuenta, sin descargar aplicaciones. Integración perfecta para la gastronomia moderna.",
+        "btn_restaurants": "Para Restaurantes",
+        "btn_diners": "Para Comensales",
+        "feat_no_app": "Sin Apps",
+        "feat_instant": "Configuración Instantánea",
+        "stats_label": "Tiempo Promedio de Pago",
+        "stats_value": "10 Segundos"
+    },
+    "how_it_works": {
+        "badge": "Experiencia Fluida",
+        "title": "Cómo Funciona",
+        "step1_title": "Escanea el QR",
+        "step1_desc": "Simplemente escanea el código QR en tu mesa con la cámara de tu teléfono. Sin apps ni cuentas.",
+        "step2_title": "Divide la Cuenta",
+        "step2_desc": "Paga solo tu parte o invita a tus amigos. Opciones de división personalizadas para una cena grupal justa.",
+        "step3_title": "Vete en Segundos",
+        "step3_desc": "El pago es instantáneo. Sin esperar terminales ni tickets de papel. Paga y listo."
+    },
+    "restaurants": {
+        "badge": "Para Restaurantes",
+        "title_start": "Gestiona tu restaurante",
+        "title_highlight": "más rápido y mejor.",
+        "feat1_title": "Rota Mesas 15 Minutos más Rápido",
+        "feat1_desc": "Elimina la espera promedio de 15 minutos por la cuenta, permitiéndote atender a más clientes por turno.",
+        "feat2_title": "40% más Propinas para el Staff",
+        "feat2_desc": "Opciones de propina precalculadas y pagos digitales fluidos fomentan mejores gratificaciones para tu equipo.",
+        "feat3_title": "Click & Collect Incluido",
+        "feat3_desc": "Diversifica tus ingresos con pedidos para llevar integrados y gestionados desde un solo panel."
+    },
+    "diners": {
+        "badge": "Para Comensales",
+        "title": "La Mejor Experiencia al Comer",
+        "feat1_title": "Apple Pay & Google Pay",
+        "feat1_desc": "Integrado para un pago seguro en un toque.",
+        "feat2_title": "Recibos Digitales",
+        "feat2_desc": "Enviados por email o guardados en tu galería al instante.",
+        "feat3_title": "Sin Cuentas",
+        "feat3_desc": "El pago como invitado es nuestro estándar por defecto.",
+        "feat4_title": "Puntos de Lealtad",
+        "feat4_desc": "Gana recompensas automáticamente con cada escaneo."
+    },
+    "social": {
+        "users": "USUARIOS FELICES",
+        "restaurants": "RESTAURANTES",
+        "secure": "PAGOS SEGUROS"
+    },
+    "footer": {
+        "description": "El sistema operativo para restaurantes modernos. Velocidad, eficiencia y mejores experiencias gastronómicas.",
+        "title_product": "Producto",
+        "title_company": "Compañía",
+        "request_demo": "Pedir Demo",
+        "about": "Nosotros",
+        "careers": "Carreras",
+        "blog": "Blog",
+        "contact": "Contacto",
+        "copyright": "© 2026 Kitos Inc. Todos los derechos reservados.",
+        "privacy": "Política de Privacidad",
+        "terms": "Términos de Servicio"
+    }
+}

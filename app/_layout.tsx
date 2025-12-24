@@ -1,3 +1,4 @@
+import '../src/i18n';
 import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { onAuthStateChanged, User } from 'firebase/auth';
