@@ -34,6 +34,14 @@ export default function OnboardingWizard() {
             if (!paymentResult.success) {
                 throw new Error('El pago no pudo ser procesado.');
             }
+            // 1. Create Restaurant with Defaults
+            console.log("Creating restaurant...");
+            // createRestaurant implicitly sets default settings if not provided in detail
+            const restaurantId = await createRestaurant(user.id, user.email, selectedPlan);
+
+            // Note: We are skipping Logo upload and Menu creation as requested.
+            // The restaurant will start with default branding (Kitos Orange) and empty menu.
+            // Using "Kitos Orange" #EA580C as default is handled in createRestaurant or the UI default.
 
             // 2. Update Subscription Status
             console.log('🔄 Updating subscription...');

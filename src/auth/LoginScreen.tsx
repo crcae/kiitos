@@ -74,7 +74,7 @@ export default function LoginScreen() {
                     <View style={styles.content}>
                         {/* Header */}
                         <View style={styles.header}>
-                            <Text style={styles.title}>Bienvenido a Kiitos</Text>
+                            <Text style={styles.title}>Bienvenido a Kitos</Text>
                             <Text style={styles.subtitle}>Divide cuentas de forma fácil</Text>
                         </View>
 

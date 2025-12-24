@@ -25,7 +25,7 @@ export default function AddCardScreen() {
         setTimeout(() => {
             setLoading(false);
             Alert.alert("Success", "Card added successfully!");
-            router.back();
+            router.replace('/(app)/profile');
         }, 1500);
     };
 
@@ -50,7 +50,7 @@ export default function AddCardScreen() {
                 style={{ flex: 1 }}
             >
                 <View style={styles.header}>
-                    <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                    <TouchableOpacity onPress={() => router.replace('/(app)/profile')} style={styles.backBtn}>
                         <ArrowLeft size={24} color="#1F2937" />
                     </TouchableOpacity>
                     <Text style={styles.title}>Add New Card</Text>
