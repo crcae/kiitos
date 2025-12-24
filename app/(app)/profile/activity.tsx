@@ -20,7 +20,7 @@ export default function ActivityHistoryScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <TouchableOpacity onPress={() => router.replace('/(app)/profile')} style={styles.backBtn}>
                     <ArrowLeft size={24} color="#1F2937" />
                 </TouchableOpacity>
                 <Text style={styles.title}>History</Text>

@@ -166,7 +166,7 @@ export default function CashierStatusScreen() {
             const html = `
                 <html>
                     <head>
-                        <title>Receipt - ${restaurant?.name || 'Kiitos'}</title>
+                        <title>Receipt - ${restaurant?.name || 'Kitos'}</title>
                         <style>
                             body { font-family: 'Courier New', monospace; padding: 20px; text-align: center; }
                             .header { margin-bottom: 20px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
@@ -180,7 +180,7 @@ export default function CashierStatusScreen() {
                     <body>
                         <div class="header">
                             ${logoUrl ? `<img src="${logoUrl}" class="logo" />` : ''}
-                            <h2>${restaurant?.name || 'Kiitos Restaurant'}</h2>
+                            <h2>${restaurant?.name || 'Kitos Restaurant'}</h2>
                             <p>${dateStr}</p>
                             <p>Table: ${session.tableName || session.tableId}</p>
                             <p>Receipt #${session.qrCode.slice(-6)}</p>
@@ -195,7 +195,7 @@ export default function CashierStatusScreen() {
                         </div>
                         <div class="footer">
                             <p>Thank you for dining with us!</p>
-                            <p>Powered by Kiitos</p>
+                            <p>Powered by Kitos</p>
                         </div>
                         <script>
                             window.onload = function() { window.print(); window.close(); }

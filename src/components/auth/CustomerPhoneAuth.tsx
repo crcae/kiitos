@@ -278,7 +278,7 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
 
                 <Text style={styles.title}>
                     {title || (
-                        step === 'phone' ? 'Bienvenido a Kiitos' :
+                        step === 'phone' ? 'Bienvenido a Kitos' :
                             step === 'otp' ? 'Verifica tu Teléfono' : '¡Casi listo!'
                     )}
                 </Text>

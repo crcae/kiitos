@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator, Dimensions, Linking, Alert, Vibration } from 'react-native';
-import { useRouter, useNavigation } from 'expo-router';
+import { useRouter, useNavigation, usePathname } from 'expo-router';
 import { Search, MapPin, Star, ChevronDown, Clock, Camera as CameraIcon, ShoppingBag, ScanLine, User } from 'lucide-react-native';
 import { collection, getDocs, query } from 'firebase/firestore';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
@@ -34,13 +34,21 @@ export default function MarketplaceHome() {
     const [restaurants, setRestaurants] = useState<MarketplaceRestaurant[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [activeFilter, setActiveFilter] = useState('Sort');
     const isFocused = useIsFocused();
     const [sheetIndex, setSheetIndex] = useState(0);
 
     // BottomSheet Ref
     const bottomSheetRef = useRef<BottomSheet>(null);
-    // SnapPoints: 15% (Scan Mode), 90% (Marketplace Mode)
-    const snapPoints = useMemo(() => ['15%', '90%'], []);
+    // SnapPoints: 25% (Higher Peek/Scan Mode), ScreenHeight - 140px (Snap-to-Header ceiling)
+    const snapPoints = useMemo(() => [SCREEN_HEIGHT * 0.25, SCREEN_HEIGHT - 140], [SCREEN_HEIGHT]);
+
+    const pathname = usePathname();
+    const { currentAction, resetAction, setMode, currentMode } = useMarketStore();
+
+    // Strict Camera Lifecycle: Only on Marketplace screen AND in SCAN mode
+    const isCameraActive = (pathname === '/(app)/marketplace' || pathname === '/marketplace') && currentMode === 'SCAN' && isFocused;
 
     // Camera State
     const [scanned, setScanned] = useState(false);
@@ -59,15 +67,13 @@ export default function MarketplaceHome() {
         }
     }, [isFocused]);
 
-    const { currentAction, resetAction } = useMarketStore();
-
     // Handle remote scroll actions -> Sheet Actions
     useEffect(() => {
         if (currentAction === 'IDLE') return;
 
         console.log('[Marketplace] Action received:', currentAction);
 
-        // Add delay to ensure BottomSheet is mounted and ready
+        // Add shorter delay to ensure BottomSheet is mounted and ready
         const timer = setTimeout(() => {
             if (currentAction === 'SCROLL_TOP') {
                 // Minimize sheet to show camera (Index 0)
@@ -77,7 +83,7 @@ export default function MarketplaceHome() {
                 bottomSheetRef.current?.snapToIndex(1);
             }
             resetAction();
-        }, 300);
+        }, 100); // Reduced delay from 300ms
 
         return () => clearTimeout(timer);
     }, [currentAction, resetAction]);
@@ -196,9 +202,30 @@ export default function MarketplaceHome() {
         }
     };
 
-    const filteredRestaurants = restaurants.filter(r =>
-        r.name && r.name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const displayedRestaurants = useMemo(() => {
+        let result = restaurants.filter(r =>
+            r.name && r.name.toLowerCase().includes(searchQuery.toLowerCase())
+        );
+
+        if (selectedCategory) {
+            result = result.filter(r => {
+                const restaurant = r as any;
+                return (restaurant.categories && restaurant.categories.includes(selectedCategory)) ||
+                    (restaurant.type && restaurant.type.toLowerCase() === selectedCategory.toLowerCase()) ||
+                    (restaurant.settings?.branding?.font_style && restaurant.settings.branding.font_style.toLowerCase().includes(selectedCategory.toLowerCase()));
+            });
+        }
+
+        if (activeFilter === 'Top Rated') {
+            result = [...result].sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        }
+
+        if (activeFilter === 'Price: Low to High') {
+            // Mock price sorting if needed, for now just a placeholder logic
+        }
+
+        return result;
+    }, [restaurants, searchQuery, selectedCategory, activeFilter]);
 
     if (!permission) {
         return <View className="flex-1 bg-black" />;
@@ -217,25 +244,27 @@ export default function MarketplaceHome() {
 
     return (
         <GestureHandlerRootView style={{ flex: 1 }}>
-            <View className="flex-1 bg-black">
+            <View style={{ flex: 1, backgroundColor: 'black', paddingTop: 60 }}>
                 {/* LAYER A: CAMERA (Background) */}
                 <View className="absolute top-0 left-0 w-full h-full z-0">
-                    <CameraView
-                        style={{ flex: 1 }}
-                        facing="back"
-                        onBarcodeScanned={scanned || !isFocused || sheetIndex !== 0 ? undefined : handleBarCodeScanned}
-                        barcodeScannerSettings={{
-                            barcodeTypes: ["qr"],
-                        }}
-                    >
-                        {/* Only show guide when needed, or maybe just always? */}
-                        <View className="flex-1 justify-center items-center mb-48">
-                            <View className="w-64 h-64 border-2 border-white/50 rounded-xl" />
-                            <Text className="text-white/80 mt-4 font-medium bg-black/40 px-4 py-1 rounded-full overflow-hidden">
-                                Scan table QR code
-                            </Text>
-                        </View>
-                    </CameraView>
+                    {isCameraActive && (
+                        <CameraView
+                            style={{ flex: 1 }}
+                            facing="back"
+                            onBarcodeScanned={scanned || !isFocused || sheetIndex !== 0 ? undefined : handleBarCodeScanned}
+                            barcodeScannerSettings={{
+                                barcodeTypes: ["qr"],
+                            }}
+                        >
+                            {/* Only show guide when needed, or maybe just always? */}
+                            <View className="flex-1 justify-center items-center mb-48">
+                                <View className="w-64 h-64 border-2 border-white/50 rounded-xl" />
+                                <Text className="text-white/80 mt-4 font-medium bg-black/40 px-4 py-1 rounded-full overflow-hidden">
+                                    Scan table QR code
+                                </Text>
+                            </View>
+                        </CameraView>
+                    )}
                 </View>
 
                 {/* BRANDING OVERLAY */}
@@ -253,7 +282,10 @@ export default function MarketplaceHome() {
                     ref={bottomSheetRef}
                     index={0} // Start collapsed (Scan mode)
                     snapPoints={snapPoints}
-                    onChange={(index) => setSheetIndex(index)}
+                    onChange={(index) => {
+                        setSheetIndex(index);
+                        setMode(index === 0 ? 'SCAN' : 'MARKET');
+                    }}
                     enablePanDownToClose={false}
                     backgroundStyle={{ backgroundColor: "#fafaf9", borderRadius: 24 }}
                     handleIndicatorStyle={{ backgroundColor: "#d6d3d1", width: 40 }}
@@ -261,32 +293,37 @@ export default function MarketplaceHome() {
                     <View className="flex-1">
                         {/* Handle / Hint Header */}
                         <View className="px-4 pb-4 border-b border-stone-100 items-center">
-                            <View className="flex-row items-center bg-stone-100 rounded-xl px-4 h-12 w-full mt-2">
+                            <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', borderRadius: 12, paddingHorizontal: 16, height: 48, width: '100%', marginTop: 8 }}>
                                 <Search size={20} color="#78716c" />
                                 <TextInput
                                     placeholder="Search restaurants & food"
                                     placeholderTextColor="#a8a29e"
-                                    className="flex-1 ml-3 text-base text-stone-900 h-full"
+                                    style={{ flex: 1, marginLeft: 12, fontSize: 16, color: '#1c1917', height: '100%' }}
                                     value={searchQuery}
                                     onChangeText={setSearchQuery}
                                 />
                             </View>
 
-                            {/* Filters */}
                             <BottomSheetScrollView
                                 horizontal
                                 showsHorizontalScrollIndicator={false}
-                                className="mt-4 w-full"
+                                className="mt-2 w-full"
                                 contentContainerStyle={{ paddingRight: 16 }}
                             >
-                                {FILTERS.map((filter, index) => (
-                                    <TouchableOpacity
-                                        key={index}
-                                        className="bg-white border border-stone-200 rounded-full px-4 py-1.5 mr-2"
-                                    >
-                                        <Text className="text-stone-600 text-xs font-medium">{filter}</Text>
-                                    </TouchableOpacity>
-                                ))}
+                                {FILTERS.map((filter, index) => {
+                                    const isActive = activeFilter === filter;
+                                    return (
+                                        <TouchableOpacity
+                                            key={index}
+                                            onPress={() => setActiveFilter(filter)}
+                                            className={`rounded-full px-4 py-1.5 mr-2 ${isActive ? 'bg-orange-600' : 'bg-white border border-stone-200'}`}
+                                        >
+                                            <Text className={`text-xs font-medium ${isActive ? 'text-white' : 'text-stone-600'}`}>
+                                                {filter}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
                             </BottomSheetScrollView>
                         </View>
 
@@ -296,7 +333,7 @@ export default function MarketplaceHome() {
                             showsVerticalScrollIndicator={false}
                         >
                             {/* Categories Section */}
-                            <View className="py-6 mb-3">
+                            <View className="pt-0 pb-4">
                                 <View className="px-4 mb-3">
                                     <Text className="text-lg font-bold text-stone-900">Categories</Text>
                                 </View>
@@ -305,36 +342,28 @@ export default function MarketplaceHome() {
                                     showsHorizontalScrollIndicator={false}
                                     contentContainerStyle={{ paddingHorizontal: 16 }}
                                 >
-                                    {CATEGORIES.map((cat) => (
-                                        <TouchableOpacity key={cat.id} className="items-center mr-6">
-                                            <Image
-                                                source={{ uri: cat.image }}
-                                                className="w-16 h-16 rounded-full bg-stone-200"
-                                                resizeMode="cover"
-                                            />
-                                            <Text className="text-stone-700 text-xs font-medium mt-2">{cat.name}</Text>
-                                        </TouchableOpacity>
-                                    ))}
+                                    {CATEGORIES.map((cat) => {
+                                        const isSelected = selectedCategory === cat.name;
+                                        return (
+                                            <TouchableOpacity
+                                                key={cat.id}
+                                                className="items-center mr-6"
+                                                onPress={() => setSelectedCategory(isSelected ? null : cat.name)}
+                                            >
+                                                <Image
+                                                    source={{ uri: cat.image }}
+                                                    className={`w-16 h-16 rounded-full bg-stone-200 ${isSelected ? 'border-2 border-orange-600' : ''}`}
+                                                    resizeMode="cover"
+                                                />
+                                                <Text className={`text-xs font-medium mt-2 ${isSelected ? 'text-orange-600 font-bold' : 'text-stone-700'}`}>
+                                                    {cat.name}
+                                                </Text>
+                                            </TouchableOpacity>
+                                        );
+                                    })}
                                 </BottomSheetScrollView>
                             </View>
 
-                            {/* Promo Banner */}
-                            <View className="px-4 mb-6">
-                                <View className="w-full h-40 bg-orange-600 rounded-2xl overflow-hidden relative shadow-md">
-                                    <Image
-                                        source={{ uri: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80' }}
-                                        className="absolute right-0 top-0 w-3/5 h-full opacity-40"
-                                        resizeMode="cover"
-                                    />
-                                    <View className="p-6 justify-center h-full max-w-[60%]">
-                                        <Text className="text-white font-bold text-2xl mb-1">Pickup Deal</Text>
-                                        <Text className="text-white/90 font-medium text-sm mb-3">Save 20% on your first order</Text>
-                                        <TouchableOpacity className="bg-white px-4 py-2 rounded-lg self-start">
-                                            <Text className="text-orange-600 font-bold text-xs">Browse Now</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                </View>
-                            </View>
 
                             {/* Most Popular */}
                             <View className="px-4">
@@ -344,13 +373,13 @@ export default function MarketplaceHome() {
 
                                 {loading ? (
                                     <ActivityIndicator size="small" color="#EA580C" />
-                                ) : filteredRestaurants.length === 0 ? (
+                                ) : displayedRestaurants.length === 0 ? (
                                     <View className="py-10 items-center bg-white rounded-xl">
-                                        <Text className="text-stone-400">No restaurants found matching "{searchQuery}"</Text>
+                                        <Text className="text-stone-400">No restaurants found matching your selection</Text>
                                     </View>
                                 ) : (
                                     <View className="gap-4">
-                                        {filteredRestaurants.map((restaurant) => (
+                                        {displayedRestaurants.map((restaurant) => (
                                             <TouchableOpacity
                                                 key={restaurant.id}
                                                 onPress={() => router.push(`/takeout/${restaurant.id}`)}

@@ -76,7 +76,7 @@ export default function AccountScreen() {
 
             await refreshUser();
             Alert.alert("Success", "Profile updated successfully.");
-            router.back();
+            router.replace('/(app)/profile');
         } catch (error: any) {
             console.error("Update Error:", error);
             Alert.alert("Update Failed", error.message);
@@ -113,7 +113,7 @@ export default function AccountScreen() {
 
             {/* CUSTOM HEADER */}
             <View style={styles.customHeader}>
-                <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+                <TouchableOpacity onPress={() => router.replace('/(app)/profile')} style={styles.backBtn}>
                     <ArrowLeft size={24} color="#1F2937" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Personal Details</Text>

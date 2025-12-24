@@ -12,7 +12,7 @@ export default function LandingPage() {
             {/* Navbar */}
             <View className="w-full px-4 py-4 sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-100">
                 <View className="max-w-7xl mx-auto w-full flex-row items-center justify-between">
-                    <Text className="font-bold text-2xl text-kiitos-black">Kiitos<Text className="text-kiitos-orange">.</Text></Text>
+                    <Text className="font-bold text-2xl text-kiitos-black">Kitos<Text className="text-kiitos-orange">.</Text></Text>
 
                     {/* Desktop Menu */}
                     <View className="hidden md:flex flex-row items-center gap-8">
@@ -284,7 +284,7 @@ export default function LandingPage() {
                 <View className="max-w-7xl mx-auto">
                     <View className="flex-col md:flex-row justify-between items-start gap-12 mb-16">
                         <View className="max-w-xs">
-                            <Text className="font-bold text-2xl text-white mb-4">Kiitos<Text className="text-kiitos-orange">.</Text></Text>
+                            <Text className="font-bold text-2xl text-white mb-4">Kitos<Text className="text-kiitos-orange">.</Text></Text>
                             <Text className="text-gray-400 leading-relaxed">
                                 The operating system for modern restaurants. Speed, efficiency, and better dining experiences.
                             </Text>
@@ -313,7 +313,7 @@ export default function LandingPage() {
                     </View>
 
                     <View className="border-t border-gray-800 pt-8 flex-col md:flex-row justify-between items-center gap-4">
-                        <Text className="text-gray-500 text-sm">© 2026 Kiitos Inc. All rights reserved.</Text>
+                        <Text style={{ color: '#444' }}>© 2026 Kitos Inc. All rights reserved.</Text>
                         <View className="flex-row gap-6">
                             <Text className="text-gray-500 text-sm hover:text-white cursor-pointer">Privacy Policy</Text>
                             <Text className="text-gray-500 text-sm hover:text-white cursor-pointer">Terms of Service</Text>
