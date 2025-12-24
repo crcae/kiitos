@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Check } from 'lucide-react-native';
+import { Check, ArrowRight, Star } from 'lucide-react-native';
 import { SubscriptionPlan } from '../src/types/firestore';
 
 interface PlanFeature {
@@ -86,267 +86,114 @@ export default function PricingPage() {
             // For enterprise, could open a contact form
             alert('Para el plan Enterprise, por favor contáctanos a ventas@kiitos.com');
         } else {
-            // Navigate to signup with selected plan
-            router.push(`/signup?plan=${planId}` as any);
+            // Navigate to register with selected plan
+            router.push(`/register?plan=${planId}` as any);
         }
     };
 
     return (
-        <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    style={styles.backButton}
-                    onPress={() => router.back()}
-                >
-                    <Text style={styles.backButtonText}>← Volver</Text>
+        <ScrollView className="flex-1 bg-white" contentContainerStyle={{ paddingBottom: 40 }}>
+            {/* Navbar Placeholder / Back Button */}
+            <View className="w-full px-6 py-6 flex-row justify-between items-center max-w-7xl mx-auto">
+                <TouchableOpacity onPress={() => router.back()} className="flex-row items-center space-x-2">
+                    <Text className="text-gray-500 hover:text-kiitos-orange font-medium">← Volver</Text>
                 </TouchableOpacity>
-                <Text style={styles.title}>Selecciona tu Plan</Text>
-                <Text style={styles.subtitle}>
-                    Todos los planes incluyen 30 días de prueba gratis. Sin tarjeta de crédito requerida.
+                <Text className="font-bold text-2xl text-kiitos-black">Kiitos<Text className="text-kiitos-orange">.</Text></Text>
+                <View className="w-16" /> {/* Spacer for centering */}
+            </View>
+
+            {/* Header */}
+            <View className="px-6 py-16 items-center bg-kiitos-black">
+                <View className="bg-white/10 px-4 py-1.5 rounded-full border border-white/20 mb-6">
+                    <Text className="text-kiitos-orange font-bold text-xs uppercase tracking-wider">Planes Flexibles</Text>
+                </View>
+                <Text className="text-4xl md:text-5xl font-bold text-white text-center mb-6">
+                    Invierte en el crecimiento de tu <Text className="text-kiitos-orange">Restaurante</Text>
+                </Text>
+                <Text className="text-lg text-gray-400 text-center max-w-2xl">
+                    Todos los planes incluyen 30 días de prueba gratis. Sin compromisos a largo plazo, cancela cuando quieras.
                 </Text>
             </View>
 
-            {/* Plans */}
-            <View style={styles.plansContainer}>
-                {PLANS.map((plan) => (
-                    <PlanCard
-                        key={plan.id}
-                        plan={plan}
-                        onSelect={() => handleSelectPlan(plan.id)}
-                    />
-                ))}
+            {/* Plans Grid */}
+            <View className="px-6 -mt-10 mb-20">
+                <View className="max-w-7xl mx-auto flex-row flex-wrap justify-center gap-8">
+                    {PLANS.map((plan) => (
+                        <View
+                            key={plan.id}
+                            className={`bg-white rounded-2xl p-8 w-full md:w-[350px] shadow-xl ${plan.highlighted
+                                    ? 'border-2 border-kiitos-orange relative transform md:-translate-y-4'
+                                    : 'border border-gray-100'
+                                }`}
+                        >
+                            {plan.highlighted && (
+                                <View className="absolute -top-4 left-0 right-0 items-center">
+                                    <View className="bg-kiitos-orange px-4 py-1 rounded-full flex-row items-center space-x-1 shadow-sm">
+                                        <Star size={12} color="white" fill="white" />
+                                        <Text className="text-white text-xs font-bold uppercase tracking-wide">Más Popular</Text>
+                                    </View>
+                                </View>
+                            )}
+
+                            <View className="mb-8 border-b border-gray-100 pb-8">
+                                <Text className="text-2xl font-bold text-kiitos-black mb-2">{plan.name}</Text>
+                                <Text className="text-gray-500 text-sm mb-6 h-10">{plan.description}</Text>
+                                <View className="flex-row items-baseline">
+                                    <Text className="text-5xl font-extrabold text-kiitos-black">{plan.price}</Text>
+                                    {plan.period ? <Text className="text-xl text-gray-500 ml-2">{plan.period}</Text> : null}
+                                </View>
+                            </View>
+
+                            <View className="space-y-4 mb-8 flex-1">
+                                {plan.features.map((feature, index) => (
+                                    <View key={index} className="flex-row items-start space-x-3">
+                                        <View className={`mt-0.5 p-0.5 rounded-full ${feature.included ? 'bg-green-100' : 'bg-gray-100'}`}>
+                                            <Check
+                                                size={14}
+                                                color={feature.included ? '#10B981' : '#9CA3AF'}
+                                                strokeWidth={3}
+                                            />
+                                        </View>
+                                        <Text className={`text-sm flex-1 ${feature.included ? 'text-gray-700' : 'text-gray-400 line-through'}`}>
+                                            {feature.text}
+                                        </Text>
+                                    </View>
+                                ))}
+                            </View>
+
+                            <TouchableOpacity
+                                className={`py-4 rounded-xl flex-row justify-center items-center space-x-2 transition-all ${plan.highlighted
+                                        ? 'bg-kiitos-orange hover:bg-orange-600 shadow-lg shadow-kiitos-orange/20'
+                                        : 'bg-kiitos-black hover:bg-gray-800'
+                                    }`}
+                                onPress={() => handleSelectPlan(plan.id)}
+                            >
+                                <Text className="text-white font-bold text-base">
+                                    {plan.id === 'enterprise' ? 'Contactar Ventas' : 'Comenzar Prueba Gratis'}
+                                </Text>
+                                {plan.id !== 'enterprise' && <ArrowRight color="white" size={18} />}
+                            </TouchableOpacity>
+                        </View>
+                    ))}
+                </View>
             </View>
 
-            {/* FAQ / Info */}
-            <View style={styles.infoSection}>
-                <Text style={styles.infoTitle}>¿Tienes preguntas?</Text>
-                <Text style={styles.infoText}>
-                    Nuestro equipo está listo para ayudarte a elegir el mejor plan para tu negocio.
+            {/* Support / FAQ Teaser */}
+            <View className="px-6 py-16 bg-gray-50 items-center">
+                <Text className="text-2xl font-bold text-kiitos-black mb-4">¿Tienes preguntas?</Text>
+                <Text className="text-gray-500 text-center mb-6 max-w-lg">
+                    Nuestro equipo de expertos está listo para ayudarte a elegir la mejor solución para tu restaurante.
                 </Text>
-                <Text style={styles.infoContact}>📧 ventas@kiitos.com</Text>
+                <TouchableOpacity className="flex-row items-center space-x-2">
+                    <Text className="text-kiitos-orange font-bold text-lg">Contactar Soporte</Text>
+                    <ArrowRight color="#f89219" size={20} />
+                </TouchableOpacity>
+            </View>
+
+            {/* Footer */}
+            <View className="py-8 bg-white border-t border-gray-100 items-center">
+                <Text className="text-gray-400 text-sm">© 2025 Kiitos Inc.</Text>
             </View>
         </ScrollView>
     );
 }
-
-function PlanCard({ plan, onSelect }: { plan: Plan; onSelect: () => void }) {
-    return (
-        <View style={[
-            styles.planCard,
-            plan.highlighted && styles.planCardHighlighted,
-        ]}>
-            {plan.highlighted && (
-                <View style={styles.badge}>
-                    <Text style={styles.badgeText}>MÁS POPULAR</Text>
-                </View>
-            )}
-
-            <View style={styles.planHeader}>
-                <Text style={styles.planName}>{plan.name}</Text>
-                <View style={styles.priceContainer}>
-                    <Text style={styles.planPrice}>{plan.price}</Text>
-                    {plan.period && <Text style={styles.planPeriod}>{plan.period}</Text>}
-                </View>
-                <Text style={styles.planDescription}>{plan.description}</Text>
-            </View>
-
-            <View style={styles.featuresContainer}>
-                {plan.features.map((feature, index) => (
-                    <View key={index} style={styles.featureRow}>
-                        <Check
-                            size={20}
-                            color={feature.included ? plan.color : '#CCCCCC'}
-                        />
-                        <Text style={[
-                            styles.featureText,
-                            !feature.included && styles.featureTextDisabled,
-                        ]}>
-                            {feature.text}
-                        </Text>
-                    </View>
-                ))}
-            </View>
-
-            <TouchableOpacity
-                style={[
-                    styles.selectButton,
-                    { backgroundColor: plan.highlighted ? plan.color : '#2C3E50' },
-                ]}
-                onPress={onSelect}
-            >
-                <Text style={styles.selectButtonText}>
-                    {plan.id === 'enterprise' ? 'Contactar Ventas' : 'Comenzar Prueba Gratis'}
-                </Text>
-            </TouchableOpacity>
-        </View>
-    );
-}
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#FDFBF7',
-    },
-    contentContainer: {
-        paddingBottom: 40,
-    },
-
-    // Header
-    header: {
-        paddingHorizontal: 20,
-        paddingVertical: 40,
-        backgroundColor: '#2C3E50',
-    },
-    backButton: {
-        marginBottom: 20,
-    },
-    backButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-    },
-    title: {
-        fontSize: 36,
-        fontWeight: 'bold',
-        color: '#FFFFFF',
-        marginBottom: 12,
-    },
-    subtitle: {
-        fontSize: 16,
-        color: '#E0E0E0',
-        lineHeight: 24,
-    },
-
-    // Plans
-    plansContainer: {
-        paddingHorizontal: 20,
-        paddingVertical: 40,
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        gap: 20,
-    },
-    planCard: {
-        backgroundColor: '#FFFFFF',
-        borderRadius: 16,
-        padding: 24,
-        width: 320,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-        elevation: 5,
-        position: 'relative',
-    },
-    planCardHighlighted: {
-        borderWidth: 3,
-        borderColor: '#E67E22',
-        transform: [{ scale: 1.05 }],
-    },
-    badge: {
-        position: 'absolute',
-        top: -12,
-        left: '50%',
-        transform: [{ translateX: -60 }],
-        backgroundColor: '#E67E22',
-        paddingHorizontal: 16,
-        paddingVertical: 6,
-        borderRadius: 20,
-    },
-    badgeText: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '600',
-    },
-
-    // Plan Header
-    planHeader: {
-        marginBottom: 24,
-        borderBottomWidth: 1,
-        borderBottomColor: '#E0E0E0',
-        paddingBottom: 24,
-    },
-    planName: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#2C3E50',
-        marginBottom: 12,
-    },
-    priceContainer: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-        marginBottom: 8,
-    },
-    planPrice: {
-        fontSize: 48,
-        fontWeight: 'bold',
-        color: '#2C3E50',
-    },
-    planPeriod: {
-        fontSize: 18,
-        color: '#666',
-        marginLeft: 4,
-    },
-    planDescription: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 20,
-    },
-
-    // Features
-    featuresContainer: {
-        marginBottom: 24,
-    },
-    featureRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-        gap: 12,
-    },
-    featureText: {
-        fontSize: 14,
-        color: '#2C3E50',
-        flex: 1,
-    },
-    featureTextDisabled: {
-        color: '#CCCCCC',
-        textDecorationLine: 'line-through',
-    },
-
-    // Button
-    selectButton: {
-        paddingVertical: 16,
-        borderRadius: 12,
-        alignItems: 'center',
-    },
-    selectButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: '600',
-    },
-
-    // Info Section
-    infoSection: {
-        paddingHorizontal: 20,
-        paddingVertical: 40,
-        alignItems: 'center',
-        backgroundColor: '#F5F5F5',
-    },
-    infoTitle: {
-        fontSize: 24,
-        fontWeight: '600',
-        color: '#2C3E50',
-        marginBottom: 12,
-    },
-    infoText: {
-        fontSize: 16,
-        color: '#666',
-        textAlign: 'center',
-        marginBottom: 16,
-    },
-    infoContact: {
-        fontSize: 18,
-        color: '#E67E22',
-        fontWeight: '600',
-    },
-});

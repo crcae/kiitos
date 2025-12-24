@@ -29,7 +29,8 @@ import {
 export async function createRestaurant(
     ownerId: string,
     ownerEmail: string,
-    plan: SubscriptionPlan
+    plan: SubscriptionPlan,
+    restaurantName: string
 ): Promise<string> {
     try {
         // Create restaurant document
@@ -45,7 +46,7 @@ export async function createRestaurant(
         const restaurant: Restaurant = {
             id: restaurantId,
             ownerId,
-            name: `Restaurant - ${ownerEmail.split('@')[0]}`, // Placeholder name
+            name: restaurantName,
             onboardingComplete: false,
             settings: {
                 currency: 'USD',
@@ -213,6 +214,29 @@ export async function updateRestaurantSettings(
     } catch (error) {
         console.error('Error updating restaurant settings:', error);
         throw new Error('Failed to update restaurant settings');
+    }
+}
+
+/**
+ * Updates restaurant subscription status
+ */
+export async function updateRestaurantSubscription(
+    restaurantId: string,
+    plan: SubscriptionPlan,
+    status: 'active' | 'trial' | 'past_due' | 'cancelled'
+): Promise<void> {
+    try {
+        const restaurantRef = doc(db, 'restaurants', restaurantId);
+
+        await updateDoc(restaurantRef, {
+            'subscription.plan': plan,
+            'subscription.status': status,
+            'subscription.updatedAt': Timestamp.now(),
+        });
+        console.log(`✅ Restaurant subscription updated: ${restaurantId}`);
+    } catch (error) {
+        console.error('Error updating restaurant subscription:', error);
+        throw new Error('Failed to update restaurant subscription');
     }
 }
 
