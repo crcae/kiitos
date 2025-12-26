@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Modal, Image, Platform, TextInput, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Clock, MapPin, Palette, Globe, QrCode, Info, X, ExternalLink } from 'lucide-react-native';
+import { ArrowLeft, Clock, MapPin, Palette, Globe, QrCode, Info, X, ExternalLink, UtensilsCrossed, ShoppingBag } from 'lucide-react-native';
 
 import { useRouter } from 'expo-router';
 import AirbnbButton from '../../../src/components/AirbnbButton';
@@ -262,6 +262,69 @@ export default function SettingsScreen() {
             </View>
 
             <ScrollView className="flex-1 px-6 py-4">
+                {/* OPERATION MODEL */}
+                <View className="mb-8">
+                    <View className="flex-row items-center mb-4">
+                        <UtensilsCrossed size={20} color="#6366f1" className="mr-2" />
+                        <Text className="text-lg font-bold text-white">Modelo de Servicio</Text>
+                    </View>
+                    <View className="flex-row gap-4">
+                        {/* Card for Table Service (Primary/Default) */}
+                        <TouchableOpacity
+                            onPress={() => autoSave({ serviceType: 'table' })}
+                            className={`flex-1 p-4 rounded-xl border-2 ${restaurant?.settings?.serviceType !== 'counter' ? 'bg-indigo-600/20 border-indigo-500' : 'bg-slate-800 border-slate-700'}`}
+                        >
+                            <View className="items-center mb-2">
+                                <View className={`w-12 h-12 rounded-full items-center justify-center mb-2 ${restaurant?.settings?.serviceType !== 'counter' ? 'bg-indigo-500' : 'bg-slate-700'}`}>
+                                    <UtensilsCrossed size={24} color="white" />
+                                </View>
+                                <Text className={`font-bold text-center ${restaurant?.settings?.serviceType !== 'counter' ? 'text-white' : 'text-slate-300'}`}>Table Service</Text>
+                            </View>
+                            <Text className="text-slate-400 text-xs text-center leading-4">
+                                Servicio completo, asignación de mesas y meseros. Restaurante tradicional.
+                            </Text>
+                        </TouchableOpacity>
+
+                        {/* Card for Counter Service */}
+                        <TouchableOpacity
+                            onPress={() => autoSave({ serviceType: 'counter' })}
+                            className={`flex-1 p-4 rounded-xl border-2 ${restaurant?.settings?.serviceType === 'counter' ? 'bg-indigo-600/20 border-indigo-500' : 'bg-slate-800 border-slate-700'}`}
+                        >
+                            <View className="items-center mb-2">
+                                <View className={`w-12 h-12 rounded-full items-center justify-center mb-2 ${restaurant?.settings?.serviceType === 'counter' ? 'bg-indigo-500' : 'bg-slate-700'}`}>
+                                    <ShoppingBag size={24} color="white" />
+                                </View>
+                                <Text className={`font-bold text-center ${restaurant?.settings?.serviceType === 'counter' ? 'text-white' : 'text-slate-300'}`}>Counter Service</Text>
+                            </View>
+                            <Text className="text-slate-400 text-xs text-center leading-4">
+                                Pedidos en barra, pago inmediato. Ideal para Fast Food o Cafeterías.
+                            </Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* TAKEOUT MODULE TOGGLE (Only for Counter Service) */}
+
+                    {/* Additional Options for Counter Service ONLY */}
+                    {restaurant?.settings?.serviceType === 'counter' && (
+                        <View className="mt-4">
+                            <AirbnbCard variant="dark">
+                                <View className="flex-row items-center justify-between py-2">
+                                    <View>
+                                        <Text className="text-white font-medium">Pedir nombre del cliente</Text>
+                                        <Text className="text-slate-400 text-xs">Ideal para cafés (estilo Starbucks) para llamar al entregar</Text>
+                                    </View>
+                                    <Switch
+                                        trackColor={{ false: "#334155", true: "#059669" }}
+                                        thumbColor={restaurant?.settings?.require_guest_name ? "#ffffff" : "#cbd5e1"}
+                                        onValueChange={(val) => autoSave({ require_guest_name: val })}
+                                        value={restaurant?.settings?.require_guest_name ?? true}
+                                    />
+                                </View>
+                            </AirbnbCard>
+                        </View>
+                    )}
+                </View>
+
                 {/* General Settings */}
                 <View className="mb-8">
                     <View className="flex-row items-center mb-4">
@@ -269,64 +332,66 @@ export default function SettingsScreen() {
                         <Text className="text-lg font-bold text-white">General</Text>
                     </View>
                     <AirbnbCard variant="dark">
-                        <View className="py-2 border-b border-slate-700">
-                            <View className="flex-row items-center justify-between">
-                                <View>
-                                    <Text className="text-white font-medium">Pedidos de Clientes</Text>
-                                    <Text className="text-slate-400 text-xs">Permitir que los clientes pidan desde su mesa</Text>
-                                </View>
-                                <Switch
-                                    trackColor={{ false: "#334155", true: "#059669" }}
-                                    thumbColor={allowGuestOrdering ? "#ffffff" : "#cbd5e1"}
-                                    onValueChange={(val) => {
-                                        setAllowGuestOrdering(val);
-                                        autoSave({ allow_guest_ordering: val });
-                                    }}
-                                    value={allowGuestOrdering}
-                                />
-                            </View>
-
-                            {/* Move Radio Restriction here */}
-                            {allowGuestOrdering && (
-                                <View className="mt-4 pt-4 border-t border-slate-700/50">
-                                    <View className="flex-row items-center justify-between mb-4">
-                                        <View>
-                                            <Text className="text-white font-medium">Restricción de Radio</Text>
-                                            <Text className="text-slate-400 text-xs">Limitar pedidos a una distancia especifica</Text>
-                                        </View>
-                                        <Switch
-                                            trackColor={{ false: "#334155", true: "#059669" }}
-                                            thumbColor={locationRestriction.enabled ? "#ffffff" : "#cbd5e1"}
-                                            onValueChange={(val) => {
-                                                const newRest = { ...locationRestriction, enabled: val };
-                                                setLocationRestriction(newRest);
-                                                autoSave({ location_restriction: newRest });
-                                            }}
-                                            value={locationRestriction.enabled}
-                                        />
+                        {restaurant?.settings?.serviceType !== 'counter' && (
+                            <View className="py-2 border-b border-slate-700">
+                                <View className="flex-row items-center justify-between">
+                                    <View>
+                                        <Text className="text-white font-medium">Pedidos de Clientes</Text>
+                                        <Text className="text-slate-400 text-xs">Permitir que los clientes pidan desde su mesa</Text>
                                     </View>
+                                    <Switch
+                                        trackColor={{ false: "#334155", true: "#059669" }}
+                                        thumbColor={allowGuestOrdering ? "#ffffff" : "#cbd5e1"}
+                                        onValueChange={(val) => {
+                                            setAllowGuestOrdering(val);
+                                            autoSave({ allow_guest_ordering: val });
+                                        }}
+                                        value={allowGuestOrdering}
+                                    />
+                                </View>
 
-                                    {locationRestriction.enabled && (
-                                        <View>
-                                            <View className="flex-row justify-between mb-2">
-                                                <Text className="text-slate-300 text-sm">Radio Máximo (metros)</Text>
-                                                <Text className="text-indigo-400 text-sm font-bold">{locationRestriction.radius_meters}m</Text>
+                                {/* Move Radio Restriction here */}
+                                {allowGuestOrdering && (
+                                    <View className="mt-4 pt-4 border-t border-slate-700/50">
+                                        <View className="flex-row items-center justify-between mb-4">
+                                            <View>
+                                                <Text className="text-white font-medium">Restricción de Radio</Text>
+                                                <Text className="text-slate-400 text-xs">Limitar pedidos a una distancia especifica</Text>
                                             </View>
-                                            <TextInput
-                                                className="bg-slate-800 text-white px-4 py-3 rounded-xl border border-slate-700 font-bold text-lg"
-                                                keyboardType="numeric"
-                                                value={String(locationRestriction.radius_meters)}
-                                                onChangeText={(t) => {
-                                                    const val = parseInt(t) || 0;
-                                                    setLocationRestriction(prev => ({ ...prev, radius_meters: val }));
+                                            <Switch
+                                                trackColor={{ false: "#334155", true: "#059669" }}
+                                                thumbColor={locationRestriction.enabled ? "#ffffff" : "#cbd5e1"}
+                                                onValueChange={(val) => {
+                                                    const newRest = { ...locationRestriction, enabled: val };
+                                                    setLocationRestriction(newRest);
+                                                    autoSave({ location_restriction: newRest });
                                                 }}
-                                                placeholder="1000"
+                                                value={locationRestriction.enabled}
                                             />
                                         </View>
-                                    )}
-                                </View>
-                            )}
-                        </View>
+
+                                        {locationRestriction.enabled && (
+                                            <View>
+                                                <View className="flex-row justify-between mb-2">
+                                                    <Text className="text-slate-300 text-sm">Radio Máximo (metros)</Text>
+                                                    <Text className="text-indigo-400 text-sm font-bold">{locationRestriction.radius_meters}m</Text>
+                                                </View>
+                                                <TextInput
+                                                    className="bg-slate-800 text-white px-4 py-3 rounded-xl border border-slate-700 font-bold text-lg"
+                                                    keyboardType="numeric"
+                                                    value={String(locationRestriction.radius_meters)}
+                                                    onChangeText={(t) => {
+                                                        const val = parseInt(t) || 0;
+                                                        setLocationRestriction(prev => ({ ...prev, radius_meters: val }));
+                                                    }}
+                                                    placeholder="1000"
+                                                />
+                                            </View>
+                                        )}
+                                    </View>
+                                )}
+                            </View>
+                        )}
                         <View className="py-2">
                             <View className="flex-row items-center justify-between">
                                 <View>
@@ -587,11 +652,11 @@ export default function SettingsScreen() {
                         </View>
                     </View>
                 </Modal>
-            </ScrollView>
+            </ScrollView >
 
 
             {/* QR Fullscreen Modal */}
-            <Modal visible={qrModalVisible} transparent animationType="fade">
+            < Modal visible={qrModalVisible} transparent animationType="fade" >
                 <View className="flex-1 justify-center items-center bg-black/90 p-6">
                     <View className="bg-white p-8 rounded-3xl items-center w-full max-w-sm">
                         <Text className="text-2xl font-bold mb-2 text-slate-900">Menú Takeout</Text>
@@ -612,7 +677,7 @@ export default function SettingsScreen() {
                         </TouchableOpacity>
                     </View>
                 </View>
-            </Modal>
-        </View>
+            </Modal >
+        </View >
     );
 }

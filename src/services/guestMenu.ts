@@ -64,23 +64,30 @@ export const sendOrderToKitchen = async (
     tableId: string,
     items: { product: Product, quantity: number, modifiers?: any[] }[],
     createdById?: string,  // Format: "guest-1", "waiter-1", etc.
-    createdByName?: string // Name of the person creating the order
+    createdByName?: string, // Name of the person creating the order
+    targetSessionId?: string // [NEW] Explicit session ID targeting
 ) => {
     if (items.length === 0) return;
 
-    const tableRef = doc(db, 'restaurants', restaurantId, 'tables', tableId);
+    const isCounter = tableId === 'counter';
+    const tableRef = isCounter ? null : doc(db, 'restaurants', restaurantId, 'tables', tableId);
 
     await runTransaction(db, async (transaction) => {
         // ============================================
         // PHASE 1: ALL READS FIRST
         // ============================================
 
-        // Read 1: Get table
-        const tableDoc = await transaction.get(tableRef);
-        if (!tableDoc.exists()) throw new Error("Table not found");
-        const tableData = tableDoc.data() as Table;
+        let sessionId: string | null = targetSessionId || null;
+        let tableData: Partial<Table> = { name: 'Counter' };
 
-        let sessionId = tableData.active_session_id;
+        if (!sessionId && !isCounter && tableRef) {
+            // Read 1: Get table (Only if we don't have a target session)
+            const tableDoc = await transaction.get(tableRef);
+            if (!tableDoc.exists()) throw new Error("Table not found");
+            tableData = tableDoc.data() as Table;
+            sessionId = tableData.active_session_id || null;
+        }
+
         let currentSession: Session | null = null;
 
         // Read 2: Get or prepare session reference
@@ -145,7 +152,7 @@ export const sendOrderToKitchen = async (
             const newSession: Partial<Session> = {
                 restaurantId,
                 tableId,
-                tableName: tableData.name,
+                tableName: tableData.name || 'Counter',
                 status: 'active',
                 startTime: serverTimestamp() as any,
                 total: newItemsTotal,
@@ -161,12 +168,14 @@ export const sendOrderToKitchen = async (
             transaction.set(newSessionRef, newSession);
 
             // Link session to table AND mark as occupied (since we have orders)
-            transaction.update(tableRef, {
-                active_session_id: sessionId,
-                status: 'occupied',
-                currentSessionId: sessionId,
-                current_session_total: newItemsTotal
-            });
+            if (!isCounter && tableRef) {
+                transaction.update(tableRef, {
+                    active_session_id: sessionId,
+                    status: 'occupied',
+                    currentSessionId: sessionId,
+                    current_session_total: newItemsTotal
+                });
+            }
         } else {
             // Update existing session
             const sessionRef = doc(db, 'restaurants', restaurantId, 'sessions', sessionId!);
@@ -183,10 +192,12 @@ export const sendOrderToKitchen = async (
             });
 
             // Sync total to Table and ensure it is occupied
-            transaction.update(tableRef, {
-                current_session_total: newSessionTotal,
-                status: 'occupied' // Ensure it's occupied just in case
-            });
+            if (!isCounter && tableRef) {
+                transaction.update(tableRef, {
+                    current_session_total: newSessionTotal,
+                    status: 'occupied' // Ensure it's occupied just in case
+                });
+            }
 
             console.log('✅ [sendOrderToKitchen] Session updated:', {
                 newTotal: newSessionTotal,
@@ -200,7 +211,7 @@ export const sendOrderToKitchen = async (
             restaurantId,
             sessionId,
             tableId,
-            tableName: tableData.name,
+            tableName: tableData.name || 'Counter',
             items: orderItems,
             status: 'sent',
             createdAt: serverTimestamp()
@@ -213,6 +224,13 @@ export const sendOrderToKitchen = async (
 export const subscribeToActiveSession = (restaurantId: string, tableId: string, callback: (items: OrderItem[], total: number, sessionId: string | null, session?: Session) => void) => {
     // Strategy: Listen to the Table to get active_session_id. 
     // Then Listen to 'orders' collection where sessionId matches.
+
+    if (tableId === 'counter') {
+        // For counter sessions, we don't have a stable table doc to find the active_session_id.
+        // However, in cashier mode, we usually already have the sessionId.
+        // If we don't have it, we just wait.
+        return () => { }; // No-op subscription for counter if table-based
+    }
 
     // 1. Listen to Table
     const tableRef = doc(db, 'restaurants', restaurantId, 'tables', tableId);

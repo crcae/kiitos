@@ -156,7 +156,8 @@ export const recordPayment = async (
                 remaining_amount: newRemaining,
                 status: newStatus,
                 paymentStatus: newPaymentStatus,
-                ...(newStatus === 'closed' && { endTime: serverTimestamp() })
+                ...(newStatus === 'closed' && { endTime: serverTimestamp() }),
+                [`payment_breakdown.${method}`]: (session.payment_breakdown?.[method as keyof typeof session.payment_breakdown] || 0) + actualAmount
             };
 
             // Update OrderItems if specific items were paid
@@ -187,7 +188,7 @@ export const recordPayment = async (
 
             // CRITICAL: Only release table if FULLY paid (with tolerance for rounding)
             const isFullyPaid = newRemaining <= 0.01; // 1 cent tolerance
-            if (newStatus === 'closed' && isFullyPaid && session.tableId) {
+            if (newStatus === 'closed' && isFullyPaid && session.tableId && session.tableId !== 'counter') {
                 console.log('🔵 [recordPayment] Session FULLY PAID, releasing table:', session.tableId);
                 const tableRef = doc(db, 'restaurants', restaurantId, 'tables', session.tableId);
                 transaction.update(tableRef, {
@@ -354,7 +355,8 @@ export const recordItemPayment = async (
                 remaining_amount: newRemaining,
                 status: newStatus,
                 paymentStatus: newPaymentStatus,
-                ...(newStatus === 'closed' && { endTime: serverTimestamp() })
+                ...(newStatus === 'closed' && { endTime: serverTimestamp() }),
+                [`payment_breakdown.${method}`]: (session.payment_breakdown?.[method as keyof typeof session.payment_breakdown] || 0) + itemsTotal
             };
 
             console.log('🔵 [recordItemPayment] Actualizando sesión con items:', {
@@ -382,7 +384,7 @@ export const recordItemPayment = async (
 
             // Release table if fully paid
             const isFullyPaid = newRemaining <= 0.01;
-            if (newStatus === 'closed' && isFullyPaid && session.tableId) {
+            if (newStatus === 'closed' && isFullyPaid && session.tableId && session.tableId !== 'counter') {
                 console.log('🔵 [recordItemPayment] Sesión completamente pagada, liberando mesa:', session.tableId);
                 const tableRef = doc(db, 'restaurants', restaurantId, 'tables', session.tableId);
                 transaction.update(tableRef, {

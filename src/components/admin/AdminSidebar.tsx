@@ -16,6 +16,7 @@ import {
     Star
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useRestaurant } from '../../hooks/useRestaurant';
 
 interface SidebarItemProps {
     title: string;
@@ -53,9 +54,12 @@ export default function AdminSidebar({
     const pathname = usePathname();
     const { signOut } = useAuth();
 
+    const { restaurant } = useRestaurant();
+    const serviceType = restaurant?.settings?.serviceType || 'table';
+
     const menuItems = [
         { title: 'Dashboard', icon: LayoutDashboard, route: '/admin' },
-        { title: 'Mesas', icon: LayoutGrid, route: '/admin/tables' },
+        { title: 'Mesas', icon: LayoutGrid, route: '/admin/tables', hidden: serviceType === 'counter' },
         { title: 'Menú', icon: UtensilsCrossed, route: '/admin/menu' },
         { title: 'Staff', icon: Users, route: '/admin/staff' },
         { title: 'Cuentas', icon: ReceiptText, route: '/admin/bills' },
@@ -64,7 +68,7 @@ export default function AdminSidebar({
         { title: 'Reseñas', icon: Star, route: '/admin/reviews' },
         { title: 'Estadísticas Staff', icon: Users, route: '/admin/staff-stats' },
         { title: 'Configuración', icon: Settings, route: '/admin/settings' },
-    ];
+    ].filter(item => !item.hidden);
 
     const handleOnItemPress = (route: string) => {
         router.push(route as any);

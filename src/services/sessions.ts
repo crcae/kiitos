@@ -59,10 +59,13 @@ export const createSession = async (restaurantId: string, tableId: string, table
     const docRef = await addDoc(sessionsRef, sessionData);
 
     // Update table status to link to session
-    try {
-        await updateTableStatus(restaurantId, tableId, 'occupied', docRef.id);
-    } catch (e) {
-        console.warn(`⚠️ [createSession] Could not update status for table ${tableId}:`, e);
+    // [FIX] Skip if tableId is 'counter' (virtual table)
+    if (tableId !== 'counter') {
+        try {
+            await updateTableStatus(restaurantId, tableId, 'occupied', docRef.id);
+        } catch (e) {
+            console.warn(`⚠️ [createSession] Could not update status for table ${tableId}:`, e);
+        }
     }
 
     console.log('✅ [createSession] Session created with ID:', docRef.id);
@@ -125,7 +128,11 @@ export const closeSession = async (restaurantId: string, sessionId: string, tabl
         status: 'closed',
         endTime: serverTimestamp()
     });
-    await updateTableStatus(restaurantId, tableId, 'available', null);
+
+    // [FIX] Skip if tableId is 'counter' (virtual table)
+    if (tableId !== 'counter') {
+        await updateTableStatus(restaurantId, tableId, 'available', null);
+    }
 };
 
 export const subscribeToActiveSessions = (callback: (sessions: Session[]) => void, restaurantId?: string) => {
@@ -192,16 +199,25 @@ export const removeItemFromSession = async (sessionId: string, itemIndex: number
     }
 };
 
+// Superseded by shift-aware subscription usually, but kept for legacy "Today" view if needed
 export const subscribeToDailyPaidSessions = (restaurantId: string, callback: (sessions: Session[]) => void) => {
     // Get start of today
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const startOfDay = Timestamp.fromDate(now);
 
+    return subscribeToShiftSessions(restaurantId, startOfDay, callback);
+};
+
+export const subscribeToShiftSessions = (restaurantId: string, startTime: Date | Timestamp, callback: (sessions: Session[]) => void) => {
+    const startTimestamp = startTime instanceof Timestamp ? startTime : Timestamp.fromDate(startTime);
+
+    console.log('📡 [subscribeToShiftSessions] Listening for sessions after:', startTimestamp.toDate().toLocaleString());
+
     const q = query(
         collection(db, 'restaurants', restaurantId, 'sessions'),
         where('status', '==', 'closed'),
-        where('endTime', '>=', startOfDay),
+        where('endTime', '>=', startTimestamp),
         orderBy('endTime', 'desc')
     );
 
@@ -227,4 +243,23 @@ export const joinSession = async (restaurantId: string, sessionId: string, staff
     });
 
     console.log('✅ [joinSession] Staff attached to session');
+};
+
+export const updateSessionNotes = async (sessionId: string, notes: string, restaurantId?: string) => {
+    const sessionRef = getSessionRef(restaurantId, sessionId);
+    await updateDoc(sessionRef, { notes });
+};
+
+export const cancelSession = async (restaurantId: string, sessionId: string, tableId: string) => {
+    const sessionRef = getSessionRef(restaurantId, sessionId);
+    await updateDoc(sessionRef, {
+        status: 'cancelled',
+        endTime: serverTimestamp()
+    });
+
+    // Skip if tableId is 'counter' (virtual table)
+    if (tableId !== 'counter') {
+        await updateTableStatus(restaurantId, tableId, 'available', null);
+    }
+    console.log(`✅ [cancelSession] Session ${sessionId} cancelled`);
 };
