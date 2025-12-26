@@ -1,17 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, FlatList, Alert, TouchableOpacity, ScrollView, Platform, Modal } from 'react-native';
-import { LogOut, Receipt, CreditCard, Banknote, Clock, RotateCcw, Search, Utensils, Plus } from 'lucide-react-native';
+import { LogOut, Receipt, CreditCard, Banknote, Clock, RotateCcw, Search, Utensils, Plus, X, FileText, Trash2, Smartphone, Home, Layers, TrendingUp } from 'lucide-react-native';
 import { useRouter } from 'expo-router'; // Updated for Navigation
-import { subscribeToActiveSessions, markSessionPaid, subscribeToDailyPaidSessions, createSession } from '../../src/services/sessions';
+import { subscribeToActiveSessions, markSessionPaid, subscribeToShiftSessions, createSession, updateSessionNotes, cancelSession } from '../../src/services/sessions';
+import { getLastShiftCut, recordShiftCut, ShiftCutStats } from '../../src/services/shifts';
 import { subscribeToTables } from '../../src/services/tables';
 import { subscribeToActivePickupOrders } from '../../src/services/pickupOrders';
 import { Session, OrderItem, Table, PickupOrder } from '../../src/types/firestore';
 import AirbnbButton from '../../src/components/AirbnbButton';
+import AirbnbInput from '../../src/components/AirbnbInput';
 import { colors, spacing, typography, shadows, borderRadius } from '../../src/styles/theme';
 import { useAuth } from '../../src/context/AuthContext';
 import { useRestaurant } from '../../src/hooks/useRestaurant';
 import PaymentInterface from '../../src/components/PaymentInterface';
-import DigitalMenuInterface from '../../src/components/DigitalMenuInterface';
+import DigitalMenuInterfaceCashier from '../../src/components/DigitalMenuInterfaceCashier';
 import { Timestamp } from 'firebase/firestore'; // Import needed for mock data
 
 
@@ -29,27 +31,55 @@ export default function CashierStatusScreen() {
     const [historySessions, setHistorySessions] = useState<Session[]>([]);
     const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null); // [LIVE DATA FIX] Store only ID
     const [selectedPickupOrderId, setSelectedPickupOrderId] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'active' | 'preorders' | 'history'>('active');
 
-
-
-    // Modal State
-    const [showPaymentModal, setShowPaymentModal] = useState(false);
-    const [showMenuModal, setShowMenuModal] = useState(false);
-    const [showTableSelector, setShowTableSelector] = useState(false); // Renamed: Table Selection Modal
-    const [newTableId, setNewTableId] = useState<string | null>(null); // For creating new orders
-    const [newTableName, setNewTableName] = useState<string>('');
-
+    // AUTH & CONTEXT (Moved up for accessibility in Effects)
     const { signOut, user } = useAuth();
     const { restaurant } = useRestaurant();
     const restaurantId = user?.restaurantId || 'kiitos-main';
 
+    // TAB STATE
+    // 'active' (All), 'counter', 'preorders', 'delivery', 'history'
+    const [activeTab, setActiveTab] = useState<'active' | 'counter' | 'preorders' | 'delivery' | 'history'>('active');
+
+    // RESTORED STATE (Moved up)
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [showMenuModal, setShowMenuModal] = useState(false);
+    const [showTableSelector, setShowTableSelector] = useState(false);
+    const [showNameInputModal, setShowNameInputModal] = useState(false);
+    const [newTableId, setNewTableId] = useState<string | null>(null);
+    const [newTableName, setNewTableName] = useState<string>('');
+    const [sessionNotes, setSessionNotes] = useState('');
+    const notesTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
+
+    // SHIFT STATE
+    const [shiftStart, setShiftStart] = useState<Timestamp | Date>(new Date(new Date().setHours(0, 0, 0, 0))); // Default Today 00:00
+    const [shiftHistorySessions, setShiftHistorySessions] = useState<Session[]>([]);
+    const [showHistoryDetailModal, setShowHistoryDetailModal] = useState(false); // To show full list
+    const [showSalesDetailModal, setShowSalesDetailModal] = useState(false); // To show Product/Financial breakdown
+    const [shiftStats, setShiftStats] = useState<ShiftCutStats | null>(null);
+
+    // Initial Load: Check for last Shift Cut
+    useEffect(() => {
+        const checkShift = async () => {
+            const lastCut = await getLastShiftCut(restaurantId);
+            if (lastCut) {
+                console.log('🕒 [Shift] Last cut found at:', lastCut.createdAt.toDate().toLocaleString());
+                setShiftStart(lastCut.createdAt);
+            } else {
+                console.log('🕒 [Shift] No previous cut, using start of day.');
+            }
+        };
+        checkShift();
+    }, [restaurantId]);
+
+    // Subscribe to Sessions based on Shift Start
     useEffect(() => {
         // Subscribe to Active Sessions
         const unsubscribeActive = subscribeToActiveSessions(setRealSessions, restaurantId);
 
-        // Subscribe to Today's History
-        const unsubscribeHistory = subscribeToDailyPaidSessions(restaurantId, setHistorySessions);
+        // Subscribe to History (Shift Sessions)
+        // [Key Change] Using subscribeToShiftSessions with dynamic start time
+        const unsubscribeHistory = subscribeToShiftSessions(restaurantId, shiftStart, setShiftHistorySessions);
 
         // Subscribe to ALL Tables
         const unsubscribeTables = subscribeToTables(restaurantId, setAllTables);
@@ -63,12 +93,47 @@ export default function CashierStatusScreen() {
             unsubscribeTables();
             unsubscribePickup();
         };
-    }, [restaurantId]);
+    }, [restaurantId, shiftStart]);
+
+    // Calculate Shift Stats Effect
+    useEffect(() => {
+        const stats: ShiftCutStats = {
+            totalSales: 0,
+            cashSales: 0,
+            cardSales: 0,
+            appSales: 0,
+            deliverySales: 0,
+            itemsSold: 0,
+            sessionCount: shiftHistorySessions.length,
+            deliveryBreakdown: { uber: 0, rappi: 0, didi: 0, other: 0 }
+        };
+
+        shiftHistorySessions.forEach(session => {
+            stats.totalSales += session.total || 0;
+            stats.itemsSold += session.items?.length || 0;
+
+            if (session.payment_breakdown) {
+                stats.cashSales += session.payment_breakdown.cash || 0;
+                stats.cardSales += session.payment_breakdown.card || 0;
+                stats.appSales += (session.payment_breakdown.transfer || 0) + (session.payment_breakdown.other || 0);
+                // Future: Add logic for delivery breakdown if stored in payment_breakdown
+            } else {
+                // Legacy Fallback (assume cash if paid)
+                if (session.paymentStatus === 'paid') {
+                    stats.cashSales += session.total;
+                }
+            }
+        });
+        setShiftStats(stats);
+    }, [shiftHistorySessions]);
+
+
 
     // [FIX] Table Inventory & Capacity Logic (Connecting REAL Firestore data)
     // Filter out "Zombie Sessions" that don't belong to a real table
+    // [ADD] Include 'counter' as a valid virtual tableId for Counter Service mode
     const validSessions = realSessions.filter(session =>
-        allTables.some(t => t.id === session.tableId)
+        session.tableId === 'counter' || allTables.some(t => t.id === session.tableId)
     );
 
     const activeTableIds = new Set(validSessions.map(s => s.tableId));
@@ -94,8 +159,43 @@ export default function CashierStatusScreen() {
     const detailData = selectedSession || selectedPickupOrder;
     const isPickupSelected = !!selectedPickupOrder;
 
+    // [NOTES SYNC]
+    useEffect(() => {
+        if (selectedSession) {
+            setSessionNotes(selectedSession.notes || '');
+        } else {
+            setSessionNotes('');
+        }
+    }, [selectedSession?.id, selectedSession?.notes]);
+
+
+
     // Handler: Start new order on an available table
-    const handleStartNewOrder = async (table: any) => {
+    const handleStartNewOrder = async (table?: any) => {
+        const isCounter = restaurant?.settings?.serviceType === 'counter';
+
+        if (isCounter) {
+            // Check if name is required
+            // Default to TRUE to be safe, unless explicitly set to false
+            const requireName = restaurant?.settings?.require_guest_name !== false;
+
+            if (requireName) {
+                setNewTableId('counter'); // Placeholder
+                setShowMenuModal(false); // Close other modals if any
+                setShowTableSelector(false);
+                setShowNameInputModal(true);
+            } else {
+                // Auto-generate order number/name
+                const randomNum = Math.floor(1000 + Math.random() * 9000); // 4 digit random
+                const autoName = `Order #${randomNum}`;
+                handleCreateCounterOrder(autoName);
+            }
+            return;
+        }
+
+        // Table Mode Logic
+        if (!table) return;
+
         try {
             console.log('🆕 [handleStartNewOrder] Creating live session for table:', table.name);
 
@@ -113,6 +213,27 @@ export default function CashierStatusScreen() {
         } catch (error) {
             console.error('❌ [handleStartNewOrder] Error:', error);
             Alert.alert('Error', 'Failed to create session');
+        }
+    };
+
+    const handleCreateCounterOrder = async (customerName: string) => {
+        try {
+            if (!customerName.trim()) {
+                Alert.alert('Error', 'Please enter a customer name');
+                return;
+            }
+            console.log('🆕 [handleCreateCounterOrder] Creating counter session for:', customerName);
+
+            // Use 'counter' as tableId, and Name as tableName
+            const sessionId = await createSession(restaurantId, 'counter', customerName);
+
+            setSelectedSessionId(sessionId);
+            setShowNameInputModal(false);
+            setNewTableName(''); // Reset for next use
+            setShowMenuModal(true);
+        } catch (error) {
+            console.error('❌ [handleCreateCounterOrder] Error:', error);
+            Alert.alert('Error', 'Failed to create order');
         }
     };
 
@@ -145,6 +266,26 @@ export default function CashierStatusScreen() {
         setNewTableId(null); // Reset new table state
         setNewTableName('');
         // In real mode, subscription updates automatically.
+    };
+
+    const handleCancelOrder = async () => {
+        if (!selectedSession) return;
+
+        // Confirm before cancelling
+        if (Platform.OS === 'web') {
+            const confirm = window.confirm("¿Estás seguro de cancelar esta orden? Esta acción no se puede deshacer.");
+            if (!confirm) return;
+        } else {
+            // Mobile alert logic could go here, but using web confirm for now as primary interface
+        }
+
+        try {
+            await cancelSession(restaurantId, selectedSession.id, selectedSession.tableId);
+            setSelectedSessionId(null);
+        } catch (error) {
+            console.error("Error cancelling session:", error);
+            Alert.alert("Error", "No se pudo cancelar la orden.");
+        }
     };
 
 
@@ -211,6 +352,81 @@ export default function CashierStatusScreen() {
         }
     };
 
+    const handleEndShift = async () => {
+        if (Platform.OS === 'web') {
+            const confirm = window.confirm("¿Estás seguro de cerrar el turno? Esto reiniciará los contadores y generará el reporte.");
+            if (!confirm) return;
+        }
+
+        if (!shiftStats) return;
+
+        try {
+            // 1. Record Shift Cut
+            const shiftId = await recordShiftCut(
+                restaurantId,
+                shiftStats,
+                { id: user?.id || 'admin', name: 'Cashier' }, // TODO: Real user data
+                shiftHistorySessions.map(s => s.id),
+                shiftStart
+            );
+
+            // 2. Print Z-Report (Using generic print logic for now, similar to daily report but with Z-Header)
+            if (Platform.OS === 'web') {
+                const printWindow = window.open('', '', 'height=600,width=400');
+                if (printWindow) {
+                    const dateStr = new Date().toLocaleString();
+                    const html = `
+                        <html>
+                        <head>
+                            <title>Z-Report - ${restaurant?.name}</title>
+                            <style>
+                                body { font-family: 'Courier New', monospace; padding: 20px; text-align: center; }
+                                .header { margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+                                .item { display: flex; justify-content: space-between; margin-bottom: 5px; font-size: 14px; }
+                                .divider { border-top: 1px dashed #000; margin: 10px 0; }
+                                .total { font-weight: bold; font-size: 20px; margin-top: 20px; text-align: right; }
+                            </style>
+                        </head>
+                        <body>
+                            <div class="header">
+                                <h2>${restaurant?.name}</h2>
+                                <h3>CORTE DE CAJA (Z-REPORT)</h3>
+                                <p>${dateStr}</p>
+                                <p>Shift ID: ${shiftId.slice(-6)}</p>
+                            </div>
+                            
+                            <div class="item"><span>Total Sales</span><span>$${shiftStats.totalSales.toFixed(2)}</span></div>
+                            <div class="divider"></div>
+                            <div class="item"><span>Cash</span><span>$${shiftStats.cashSales.toFixed(2)}</span></div>
+                            <div class="item"><span>Card</span><span>$${shiftStats.cardSales.toFixed(2)}</span></div>
+                            <div class="item"><span>Transfer/App</span><span>$${shiftStats.appSales.toFixed(2)}</span></div>
+                            
+                            <div class="divider"></div>
+                            <p>Items Sold: ${shiftStats.itemsSold}</p>
+                            <p>Sessions: ${shiftStats.sessionCount}</p>
+                            
+                            <div class="total">Global Total: $${shiftStats.totalSales.toFixed(2)}</div>
+                        </body>
+                        <script>window.onload = function() { window.print(); window.close(); }</script>
+                        </html>
+                    `;
+                    printWindow.document.write(html);
+                    printWindow.document.close();
+                }
+            }
+
+            // 3. Update Shift Start to Now (Effectively resetting view)
+            setShiftStart(Timestamp.now());
+            setShiftStats(null);
+            setShiftHistorySessions([]);
+
+            Alert.alert("Shift Closed", "El turno ha sido cerrado y el reporte generado.");
+        } catch (error) {
+            console.error("Error closing shift:", error);
+            Alert.alert("Error", "No se pudo cerrar el turno.");
+        }
+    };
+
     const handleEditOrder = () => {
         if (!selectedSession) return;
         setShowMenuModal(true);
@@ -239,25 +455,56 @@ export default function CashierStatusScreen() {
                 </View>
             </View>
 
+
+            {/* Daily Stats Calculation - Only relevant for history tab */}
+            {
+                activeTab === 'history' && (
+                    <View style={{ position: 'absolute' }}>
+                        {/* Invisible calculation trigger or just relying on render logic */}
+                    </View>
+                )
+            }
+
             {/* CENTRAL TABS */}
             <View style={styles.tabContainer}>
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'active' && styles.activeTab]}
-                    onPress={() => { setActiveTab('active'); setSelectedSessionId(null); }}
+                    onPress={() => { setActiveTab('active'); setSelectedSessionId(null); setSelectedPickupOrderId(null); }}
                 >
-                    <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>Active Tables</Text>
+                    <Layers size={16} color={activeTab === 'active' ? colors.roastedSaffron : colors.gray} />
+                    <Text style={[styles.tabText, activeTab === 'active' && styles.activeTabText]}>Active Orders</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.tab, activeTab === 'preorders' && styles.activeTab]}
-                    onPress={() => { setActiveTab('preorders'); setSelectedSessionId(null); setSelectedPickupOrderId(null); }}
+                    style={[styles.tab, activeTab === 'counter' && styles.activeTab]}
+                    onPress={() => { setActiveTab('counter'); setSelectedSessionId(null); setSelectedPickupOrderId(null); }}
                 >
-                    <Text style={[styles.tabText, activeTab === 'preorders' && styles.activeTabText]}>Preorders</Text>
+                    <Home size={16} color={activeTab === 'counter' ? colors.roastedSaffron : colors.gray} />
+                    <Text style={[styles.tabText, activeTab === 'counter' && styles.activeTabText]}>Counter</Text>
                 </TouchableOpacity>
+                {(restaurant?.settings?.serviceType !== 'counter' || restaurant?.settings?.enable_takeout) && (
+                    <>
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'preorders' && styles.activeTab]}
+                            onPress={() => { setActiveTab('preorders'); setSelectedSessionId(null); setSelectedPickupOrderId(null); }}
+                        >
+                            <Utensils size={16} color={activeTab === 'preorders' ? colors.roastedSaffron : colors.gray} />
+                            <Text style={[styles.tabText, activeTab === 'preorders' && styles.activeTabText]}>Preorders</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.tab, activeTab === 'delivery' && styles.activeTab]}
+                            onPress={() => { setActiveTab('delivery'); setSelectedSessionId(null); setSelectedPickupOrderId(null); }}
+                        >
+                            <Smartphone size={16} color={activeTab === 'delivery' ? colors.roastedSaffron : colors.gray} />
+                            <Text style={[styles.tabText, activeTab === 'delivery' && styles.activeTabText]}>Delivery</Text>
+                        </TouchableOpacity>
+                    </>
+                )}
                 <TouchableOpacity
                     style={[styles.tab, activeTab === 'history' && styles.activeTab]}
                     onPress={() => { setActiveTab('history'); setSelectedSessionId(null); setSelectedPickupOrderId(null); }}
                 >
-                    <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>Daily History</Text>
+                    <Clock size={16} color={activeTab === 'history' ? colors.roastedSaffron : colors.gray} />
+                    <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>Corte de Turno</Text>
                 </TouchableOpacity>
             </View>
 
@@ -265,7 +512,13 @@ export default function CashierStatusScreen() {
                 {/* + NEW ORDER BUTTON */}
                 <TouchableOpacity
                     style={[styles.logoutBtn, { backgroundColor: colors.albahaca }]}
-                    onPress={() => setShowTableSelector(true)}
+                    onPress={() => {
+                        if (restaurant?.settings?.serviceType === 'counter') {
+                            handleStartNewOrder();
+                        } else {
+                            setShowTableSelector(true);
+                        }
+                    }}
                 >
                     <Plus size={18} color="white" />
                     <Text style={styles.logoutText}>New Order</Text>
@@ -278,16 +531,30 @@ export default function CashierStatusScreen() {
                     <Text style={styles.logoutText}>Logout</Text>
                 </TouchableOpacity>
             </View>
-        </View>
+        </View >
     );
 
+    const lastTap = React.useRef<number>(0);
     const renderActiveSessionCard = ({ item }: { item: Session }) => (
         <TouchableOpacity
+            activeOpacity={0.7}
             style={[
                 styles.card,
                 selectedSession?.id === item.id && styles.selectedCard
             ]}
-            onPress={() => setSelectedSessionId(item.id)} // [LIVE DATA FIX] Store only ID
+            onPress={() => {
+                const now = Date.now();
+                const DOUBLE_PRESS_DELAY = 300;
+                if (now - lastTap.current < DOUBLE_PRESS_DELAY) {
+                    // Double tap action
+                    setSelectedSessionId(item.id);
+                    setShowMenuModal(true);
+                } else {
+                    // Single tap action
+                    setSelectedSessionId(item.id);
+                }
+                lastTap.current = now;
+            }}
         >
             <View style={styles.cardHeader}>
                 <Text style={styles.tableTitle}>{item.tableName || `Table ${item.tableId}`}</Text>
@@ -365,141 +632,398 @@ export default function CashierStatusScreen() {
             {renderHeader()}
 
 
-            {/* MAIN CONTENT SPLIT */}
-            <View style={styles.splitLayout}>
-                {/* LEFT PANEL: GRID */}
-                <View style={styles.leftPanel}>
-                    {activeTab === 'active' ? (
-                        <FlatList
-                            key="active-grid"
-                            data={validSessions}
-                            renderItem={({ item }) => renderActiveSessionCard({ item })}
-                            keyExtractor={item => `session-${item.id}`}
-                            numColumns={3}
-                            contentContainerStyle={styles.gridContainer}
-                            columnWrapperStyle={{ gap: spacing.md }}
-                            ListEmptyComponent={
-                                <View style={styles.emptyState}>
-                                    <View style={styles.emptyIconBg}>
-                                        <Clock size={40} color={colors.gray} />
-                                    </View>
-                                    <Text style={styles.emptyText}>No active orders</Text>
-                                    <Text style={styles.emptySubtext}>New orders will appear here automatically.</Text>
-                                </View>
-                            }
-                        />
-                    ) : activeTab === 'preorders' ? (
-                        <FlatList
-                            key="preorders-grid"
-                            data={pickupOrders}
-                            renderItem={({ item }) => renderPickupOrderCard({ item })}
-                            keyExtractor={item => `pickup-${item.id}`}
-                            numColumns={3}
-                            contentContainerStyle={styles.gridContainer}
-                            columnWrapperStyle={{ gap: spacing.md }}
-                            ListEmptyComponent={
-                                <View style={styles.emptyState}>
-                                    <View style={styles.emptyIconBg}>
-                                        <Utensils size={40} color={colors.gray} />
-                                    </View>
-                                    <Text style={styles.emptyText}>No preorders yet</Text>
-                                    <Text style={styles.emptySubtext}>Incoming takeout orders will show up here.</Text>
-                                </View>
-                            }
-                        />
-                    ) : (
-                        <FlatList
-                            key="history-list"
-                            data={historySessions}
-                            renderItem={renderHistoryItem}
-                            keyExtractor={item => item.id}
-                            contentContainerStyle={styles.listContainer}
-                            ListEmptyComponent={
-                                <View style={styles.emptyState}>
-                                    <Text style={styles.emptyText}>No history for today</Text>
-                                </View>
-                            }
-                        />
-                    )}
-                </View>
+            {/* MAIN CONTENT SPLIT OR FULL DASHBOARD */}
+            {activeTab === 'history' ? (
+                // SHIFT DASHBOARD (Overlay Full Width)
+                <ScrollView style={{ flex: 1, padding: 24 }} contentContainerStyle={{ gap: 24 }}>
+                    {/* KPI CARDS ROW */}
+                    <View style={{ flexDirection: 'row', gap: 24 }}>
+                        {/* TOTAL SALES */}
+                        <View style={[styles.kpiCard, { flex: 1, backgroundColor: '#fff', borderLeftWidth: 4, borderLeftColor: colors.roastedSaffron }]}>
+                            <Text style={styles.kpiTitle}>Ventas Totales</Text>
+                            <Text style={[styles.kpiValue, { color: colors.castIron }]}>
+                                ${shiftStats?.totalSales.toFixed(2) || '0.00'}
+                            </Text>
+                            <Text style={styles.kpiSubtitle}>{shiftStats?.itemsSold || 0} productos vendidos</Text>
+                        </View>
 
-                {/* RIGHT PANEL: DETAILS */}
-                <View style={styles.rightPanel}>
-                    {detailData ? (
-                        <View style={styles.detailContent}>
-                            <View style={styles.detailHeader}>
+                        {/* BREAKDOWN */}
+                        <View style={[styles.kpiCard, { flex: 2, backgroundColor: '#fff' }]}>
+                            <Text style={styles.kpiTitle}>Desglose por Método</Text>
+                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
                                 <View>
-                                    <Text style={styles.detailTitle}>
-                                        {isPickupSelected
-                                            ? (selectedPickupOrder?.customer_name || `Pickup ${selectedPickupOrder?.pickup_code}`)
-                                            : (selectedSession?.tableName || `Table ${selectedSession?.tableId}`)
-                                        }
-                                    </Text>
-                                    <Text style={styles.detailSubtitle}>
-                                        {isPickupSelected
-                                            ? `Code: ${selectedPickupOrder?.pickup_code}`
-                                            : `Order #${(selectedSession?.qrCode || selectedSession?.id || "000000").slice(-6)}`
-                                        }
+                                    <Text style={styles.breakdownLabel}>Efectivo</Text>
+                                    <Text style={styles.breakdownValue}>${shiftStats?.cashSales.toFixed(2) || '0.00'}</Text>
+                                </View>
+                                <View>
+                                    <Text style={styles.breakdownLabel}>Tarjeta</Text>
+                                    <Text style={styles.breakdownValue}>${shiftStats?.cardSales.toFixed(2) || '0.00'}</Text>
+                                </View>
+                                <View>
+                                    <Text style={styles.breakdownLabel}>Apps / Transfer</Text>
+                                    <Text style={styles.breakdownValue}>${shiftStats?.appSales.toFixed(2) || '0.00'}</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        {/* STATUS */}
+                        <View style={[styles.kpiCard, { flex: 1, backgroundColor: '#f8f9fa' }]}>
+                            <Text style={styles.kpiTitle}>Turno Actual</Text>
+                            <View style={{ marginTop: 8, gap: 4 }}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <Clock size={16} color={colors.gray} />
+                                    <Text style={{ color: colors.gray, fontSize: 13 }}>
+                                        Inicio: {shiftStart instanceof Timestamp
+                                            ? shiftStart.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                            : shiftStart.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                     </Text>
                                 </View>
-                                <TouchableOpacity onPress={() => handlePrintReceipt(detailData as any)} style={styles.printButton}>
-                                    <Receipt size={20} color={colors.castIron} />
-                                    <Text style={styles.printText}>Print</Text>
-                                </TouchableOpacity>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#10b981' }} />
+                                    <Text style={{ color: '#10b981', fontSize: 13, fontWeight: 'bold' }}>Active</Text>
+                                </View>
                             </View>
+                        </View>
+                    </View>
 
-                            <ScrollView style={styles.itemsList}>
-                                {detailData.items.map((item, index) => (
-                                    <View key={('id' in item ? item.id : item.product_id) + '-' + index} style={styles.itemRow}>
-                                        <View style={styles.itemInfo}>
-                                            <View style={styles.qtyBadge}>
-                                                <Text style={styles.qtyText}>{item.quantity}</Text>
-                                            </View>
-                                            <View>
-                                                <Text style={styles.itemName}>{item.name}</Text>
-                                                {/* @ts-ignore */}
-                                                {item.notes ? <Text style={styles.itemNotes}>{item.notes}</Text> : null}
-                                            </View>
-                                        </View>
-                                        <Text style={styles.itemPrice}>${(item.price * item.quantity).toFixed(2)}</Text>
+                    {/* ACTIONS ROW */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <TouchableOpacity
+                            onPress={() => setShowHistoryDetailModal(true)}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderWidth: 1, borderColor: colors.gray, borderRadius: 8 }}
+                        >
+                            <FileText size={20} color={colors.gray} />
+                            <Text style={{ fontWeight: '500', color: colors.gray }}>Ver Desglose de Órdenes</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={() => setShowSalesDetailModal(true)}
+                            style={{ flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderWidth: 1, borderColor: colors.gray, borderRadius: 8, marginLeft: 12 }}
+                        >
+                            <TrendingUp size={20} color={colors.gray} />
+                            <Text style={{ fontWeight: '500', color: colors.gray }}>Ver Desglose de Ventas</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            onPress={handleEndShift}
+                            style={{
+                                flexDirection: 'row', alignItems: 'center', gap: 8,
+                                paddingHorizontal: 24, paddingVertical: 14,
+                                backgroundColor: '#dc2626', borderRadius: 8,
+                                ...shadows.md
+                            }}
+                        >
+                            <LogOut size={20} color="white" />
+                            <Text style={{ fontWeight: 'bold', color: 'white', fontSize: 16 }}>Realizar Corte e Imprimir</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* HISTORY DETAIL MODAL */}
+                    <Modal visible={showHistoryDetailModal} animationType="slide" transparent>
+                        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 40 }}>
+                            <View style={{ backgroundColor: 'white', borderRadius: 16, flex: 1, padding: 24 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                                    <Text style={{ fontSize: 24, fontWeight: 'bold' }}>Desglose de Órdenes (Turno Actual)</Text>
+                                    <TouchableOpacity onPress={() => setShowHistoryDetailModal(false)}>
+                                        <X size={24} color="black" />
+                                    </TouchableOpacity>
+                                </View>
+                                <FlatList
+                                    data={shiftHistorySessions}
+                                    renderItem={renderHistoryItem}
+                                    keyExtractor={item => item.id}
+                                    contentContainerStyle={{ paddingBottom: 20 }}
+                                />
+                            </View>
+                        </View>
+                    </Modal>
+
+                    {/* SALES DETAIL MODAL (New Feature) */}
+                    <Modal visible={showSalesDetailModal} animationType="slide" transparent>
+                        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 40 }}>
+                            <View style={{ backgroundColor: 'white', borderRadius: 16, flex: 1, padding: 24, paddingBottom: 0 }}>
+                                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 }}>
+                                    <View>
+                                        <Text style={{ fontSize: 24, fontWeight: 'bold' }}>Desglose de Ventas</Text>
+                                        <Text style={{ color: colors.gray }}>{new Date().toLocaleDateString()}</Text>
                                     </View>
-                                ))}
-                            </ScrollView>
+                                    <TouchableOpacity onPress={() => setShowSalesDetailModal(false)}>
+                                        <X size={24} color="black" />
+                                    </TouchableOpacity>
+                                </View>
 
-                            <View style={styles.footerSection}>
+                                {/* Calculate Stats on the fly for display */}
                                 {(() => {
-                                    // Defensive: Calculate totals from items if session totals are missing/zero
-                                    const itemsTotal = detailData.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-                                    const displaySubtotal = (detailData.subtotal || 0) > 0 ? detailData.subtotal : itemsTotal;
-                                    const displayTax = (detailData.tax || 0) > 0 ? detailData.tax : displaySubtotal * 0.16;
-                                    const displayTotal = (detailData.total || 0) > 0 ? detailData.total : (displaySubtotal + displayTax);
+                                    // Calculate Stats
+                                    const reportStats = shiftHistorySessions.reduce((acc, session) => {
+                                        acc.total += session.total || 0;
+                                        acc.itemsSold += session.items?.length || 0;
+
+                                        // Payment Methods
+                                        if (session.payment_breakdown) {
+                                            acc.cash += session.payment_breakdown.cash || 0;
+                                            acc.card += session.payment_breakdown.card || 0;
+                                            acc.app += session.payment_breakdown.transfer || session.payment_breakdown.other || 0;
+                                        } else {
+                                            // Legacy Fallback
+                                            if (session.paymentStatus === 'paid') {
+                                                // Assume cash if not specified or legacy
+                                                acc.cash += session.total || 0;
+                                            } else {
+                                                acc.uncategorized += session.amount_paid || session.total || 0;
+                                            }
+                                        }
+
+                                        // Product Sales
+                                        session.items?.forEach(item => {
+                                            if (!acc.products[item.name]) {
+                                                acc.products[item.name] = { qty: 0, total: 0 };
+                                            }
+                                            acc.products[item.name].qty += item.quantity;
+                                            acc.products[item.name].total += (item.price * item.quantity);
+                                        });
+
+                                        return acc;
+                                    }, {
+                                        total: 0,
+                                        cash: 0,
+                                        card: 0,
+                                        app: 0,
+                                        uncategorized: 0,
+                                        itemsSold: 0,
+                                        products: {} as Record<string, { qty: number, total: number }>
+                                    });
 
                                     return (
-                                        <>
-                                            <View style={styles.summaryRow}>
-                                                <Text style={styles.summaryLabel}>Subtotal</Text>
-                                                <Text style={styles.summaryValue}>${displaySubtotal.toFixed(2)}</Text>
-                                            </View>
-                                            <View style={styles.summaryRow}>
-                                                <Text style={styles.summaryLabel}>Tax</Text>
-                                                <Text style={styles.summaryValue}>${displayTax.toFixed(2)}</Text>
-                                            </View>
-                                            {isPickupSelected && selectedPickupOrder?.payment_intent_id && (
-                                                <View style={styles.summaryRow}>
-                                                    <Text style={[styles.summaryLabel, { color: '#059669', fontWeight: 'bold' }]}>Paid Online</Text>
-                                                    <Text style={[styles.summaryValue, { color: '#059669', fontWeight: 'bold' }]}>Yes</Text>
+                                        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 16, paddingBottom: 24 }}>
+                                            {/* FINANCIAL SUMMARY */}
+                                            <View style={{ padding: 16, backgroundColor: colors.offWhite, borderRadius: 8 }}>
+                                                <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12, color: colors.castIron }}>Resumen Financiero</Text>
+                                                <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Efectivo (Cash)</Text><Text style={styles.summaryValue}>${reportStats.cash.toFixed(2)}</Text></View>
+                                                <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Tarjeta (Card)</Text><Text style={styles.summaryValue}>${reportStats.card.toFixed(2)}</Text></View>
+                                                <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Apps / Transfer</Text><Text style={styles.summaryValue}>${reportStats.app.toFixed(2)}</Text></View>
+                                                {reportStats.uncategorized > 0 && (
+                                                    <View style={styles.summaryRow}><Text style={styles.summaryLabel}>Sin Categoría</Text><Text style={styles.summaryValue}>${reportStats.uncategorized.toFixed(2)}</Text></View>
+                                                )}
+                                                <View style={[styles.summaryRow, { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderColor: colors.lightGray }]}>
+                                                    <Text style={[styles.totalLabel, { fontSize: 18 }]}>Ventas Totales</Text>
+                                                    <Text style={[styles.totalValue, { fontSize: 18 }]}>${reportStats.total.toFixed(2)}</Text>
                                                 </View>
-                                            )}
-                                            <View style={[styles.summaryRow, styles.totalRow]}>
-                                                <Text style={styles.totalLabel}>Total</Text>
-                                                <Text style={styles.totalValue}>${displayTotal.toFixed(2)}</Text>
                                             </View>
-                                        </>
+
+                                            {/* PRODUCT SALES */}
+                                            <View style={{ padding: 16, backgroundColor: colors.offWhite, borderRadius: 8 }}>
+                                                <Text style={{ fontSize: 16, fontWeight: 'bold', marginBottom: 12, color: colors.castIron }}>Ventas por Producto</Text>
+                                                {Object.entries(reportStats.products)
+                                                    .sort((a, b) => b[1].total - a[1].total)
+                                                    .map(([name, stat], idx) => (
+                                                        <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: idx < Object.keys(reportStats.products).length - 1 ? 1 : 0, borderBottomColor: colors.lightGray }}>
+                                                            <Text style={{ flex: 1, fontSize: 14 }}>{stat.qty}x {name}</Text>
+                                                            <Text style={{ fontWeight: '600' }}>${stat.total.toFixed(2)}</Text>
+                                                        </View>
+                                                    ))}
+                                            </View>
+                                        </ScrollView>
                                     );
                                 })()}
+                            </View>
+                        </View>
+                    </Modal>
 
-                                {activeTab !== 'history' && (
+
+                </ScrollView>
+            ) : (
+                /* SPLIT LAYOUT FOR ACTIVE/COUNTER/ETC */
+                <View style={styles.splitLayout}>
+                    {/* LEFT PANEL: GRID */}
+                    <View style={styles.leftPanel}>
+                        {activeTab === 'active' && (
+                            <FlatList
+                                key="active-grid"
+                                data={validSessions}
+                                renderItem={({ item }) => renderActiveSessionCard({ item })}
+                                keyExtractor={item => `session-${item.id}`}
+                                numColumns={3}
+                                contentContainerStyle={styles.gridContainer}
+                                columnWrapperStyle={{ gap: spacing.md }}
+                                ListEmptyComponent={
+                                    <View style={styles.emptyState}>
+                                        <View style={styles.emptyIconBg}>
+                                            <Layers size={40} color={colors.gray} />
+                                        </View>
+                                        <Text style={styles.emptyText}>No active orders</Text>
+                                        <Text style={styles.emptySubtext}>All active orders will appear here.</Text>
+                                    </View>
+                                }
+                            />
+                        )}
+
+                        {activeTab === 'counter' && (
+                            <FlatList
+                                key="counter-grid"
+                                data={validSessions.filter(s => s.tableId === 'counter')}
+                                renderItem={({ item }) => renderActiveSessionCard({ item })}
+
+                                keyExtractor={item => `session-${item.id}`}
+                                numColumns={3}
+                                contentContainerStyle={styles.gridContainer}
+                                columnWrapperStyle={{ gap: spacing.md }}
+                                ListEmptyComponent={
+                                    <View style={styles.emptyState}>
+                                        <View style={styles.emptyIconBg}>
+                                            <Home size={40} color={colors.gray} />
+                                        </View>
+                                        <Text style={styles.emptyText}>No counter orders</Text>
+                                        <Text style={styles.emptySubtext}>Orders created in "Counter" mode appear here.</Text>
+                                    </View>
+                                }
+                            />
+                        )}
+
+                        {activeTab === 'preorders' && (
+                            <FlatList
+                                key="preorders-grid"
+                                data={pickupOrders}
+                                renderItem={({ item }) => renderPickupOrderCard({ item })}
+                                keyExtractor={item => `pickup-${item.id}`}
+                                numColumns={3}
+                                contentContainerStyle={styles.gridContainer}
+                                columnWrapperStyle={{ gap: spacing.md }}
+                                ListEmptyComponent={
+                                    <View style={styles.emptyState}>
+                                        <View style={styles.emptyIconBg}>
+                                            <Utensils size={40} color={colors.gray} />
+                                        </View>
+                                        <Text style={styles.emptyText}>No preorders yet</Text>
+                                        <Text style={styles.emptySubtext}>Incoming takeout orders will show up here.</Text>
+                                    </View>
+                                }
+                            />
+                        )}
+
+                        {activeTab === 'delivery' && (
+                            <View style={styles.emptyState}>
+                                <View style={styles.emptyIconBg}>
+                                    <Smartphone size={40} color={colors.gray} />
+                                </View>
+                                <Text style={styles.emptyText}>Delivery Apps</Text>
+                                <Text style={styles.emptySubtext}>Integration with Rappi, Uber, Didi coming soon.</Text>
+                            </View>
+                        )}
+
+                    </View>
+
+                    {/* RIGHT PANEL: DETAILS */}
+                    <View style={styles.rightPanel}>
+                        {detailData ? (
+                            /* ================== STANDARD ORDER DETAIL ================== */
+                            <View style={styles.detailContent}>
+                                <View style={styles.detailHeader}>
+                                    <View>
+                                        <Text style={styles.detailTitle}>
+                                            {isPickupSelected
+                                                ? (selectedPickupOrder?.customer_name || `Pickup ${selectedPickupOrder?.pickup_code}`)
+                                                : (selectedSession?.tableName || `Table ${selectedSession?.tableId}`)
+                                            }
+                                        </Text>
+                                        <Text style={styles.detailSubtitle}>
+                                            {isPickupSelected
+                                                ? `Code: ${selectedPickupOrder?.pickup_code}`
+                                                : `Order #${(selectedSession?.qrCode || selectedSession?.id || "000000").slice(-6)}`
+                                            }
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity onPress={() => handlePrintReceipt(detailData as any)} style={styles.printButton}>
+                                        <Receipt size={20} color={colors.castIron} />
+                                        <Text style={styles.printText}>Print</Text>
+                                    </TouchableOpacity>
+                                </View>
+
+                                <ScrollView style={styles.itemsList}>
+                                    {detailData.items.map((item, index) => (
+                                        <View key={('id' in item ? item.id : item.product_id) + '-' + index} style={styles.itemRow}>
+                                            <View style={styles.itemInfo}>
+                                                <View style={styles.qtyBadge}>
+                                                    <Text style={styles.qtyText}>{item.quantity}</Text>
+                                                </View>
+                                                <View>
+                                                    <Text style={styles.itemName}>{item.name}</Text>
+                                                    {/* @ts-ignore */}
+                                                    {item.notes ? <Text style={styles.itemNotes}>{item.notes}</Text> : null}
+                                                </View>
+                                            </View>
+                                            <Text style={styles.itemPrice}>${(item.price * item.quantity).toFixed(2)}</Text>
+                                        </View>
+                                    ))}
+                                </ScrollView>
+
+                                <View style={styles.footerSection}>
+                                    {(() => {
+                                        const itemsTotal = (detailData.items as any[]).reduce((sum: number, item: any) => sum + (item.price * (item.quantity || 1)), 0);
+                                        const displaySubtotal = (detailData.subtotal || 0) > 0 ? detailData.subtotal : itemsTotal;
+                                        const displayTax = (detailData.tax || 0) > 0 ? detailData.tax : displaySubtotal * 0.16;
+                                        const displayTotal = (detailData.total || 0) > 0 ? detailData.total : (displaySubtotal + displayTax);
+
+                                        return (
+                                            <>
+                                                {!isPickupSelected && selectedSession && (
+                                                    <View style={{ marginBottom: 16 }}>
+                                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+                                                            <FileText size={14} color={colors.gray} />
+                                                            <Text style={{ fontSize: 12, color: colors.gray, fontWeight: 'bold' }}>Notas Generales</Text>
+                                                        </View>
+                                                        <AirbnbInput
+                                                            testID="session-notes-input"
+                                                            label="Notas"
+                                                            value={sessionNotes}
+                                                            onChangeText={(text) => {
+                                                                setSessionNotes(text);
+                                                                if (notesTimeoutRef.current) clearTimeout(notesTimeoutRef.current);
+                                                                notesTimeoutRef.current = setTimeout(() => {
+                                                                    if (selectedSession?.id) {
+                                                                        updateSessionNotes(selectedSession.id, text, restaurantId);
+                                                                    }
+                                                                }, 800);
+                                                            }}
+                                                            placeholder="Mesa 5, alérgico a nueces, etc."
+                                                            multiline
+                                                            style={{ minHeight: 60, fontSize: 12 }}
+                                                        />
+                                                    </View>
+                                                )}
+                                                <View style={styles.summaryRow}>
+                                                    <Text style={styles.summaryLabel}>Subtotal</Text>
+                                                    <Text style={styles.summaryValue}>${displaySubtotal.toFixed(2)}</Text>
+                                                </View>
+                                                <View style={styles.summaryRow}>
+                                                    <Text style={styles.summaryLabel}>Tax</Text>
+                                                    <Text style={styles.summaryValue}>${displayTax.toFixed(2)}</Text>
+                                                </View>
+                                                {isPickupSelected && selectedPickupOrder?.payment_intent_id && (
+                                                    <View style={styles.summaryRow}>
+                                                        <Text style={[styles.summaryLabel, { color: '#059669', fontWeight: 'bold' }]}>Paid Online</Text>
+                                                        <Text style={[styles.summaryValue, { color: '#059669', fontWeight: 'bold' }]}>Yes</Text>
+                                                    </View>
+                                                )}
+                                                <View style={[styles.summaryRow, styles.totalRow]}>
+                                                    <Text style={styles.totalLabel}>Total</Text>
+                                                    <Text style={styles.totalValue}>${displayTotal.toFixed(2)}</Text>
+                                                </View>
+                                            </>
+                                        );
+                                    })()}
+
                                     <View style={styles.actions}>
+                                        {!isPickupSelected && (selectedSession?.total === 0 || selectedSession?.items.length === 0) && (
+                                            <TouchableOpacity
+                                                style={[styles.actionBtn, { backgroundColor: '#fee2e2', borderColor: '#fee2e2' }]}
+                                                onPress={handleCancelOrder}
+                                            >
+                                                <Trash2 size={24} color={colors.chile} />
+                                                <Text style={[styles.actionBtnText, { color: colors.chile }]}>Cancelar</Text>
+                                            </TouchableOpacity>
+                                        )}
+
                                         {!isPickupSelected && (
                                             <TouchableOpacity
                                                 style={[styles.actionBtn, styles.menuBtn]}
@@ -519,17 +1043,16 @@ export default function CashierStatusScreen() {
                                             </Text>
                                         </TouchableOpacity>
                                     </View>
-                                )}
+                                </View>
                             </View>
-                        </View>
-                    ) : (
-                        <View style={styles.emptyDetail}>
-                            <Text style={styles.emptyDetailText}>Select a table to view details</Text>
-                        </View>
-                    )}
+                        ) : (
+                            <View style={styles.emptyDetail}>
+                                <Text style={styles.emptyDetailText}>Select an order to view details</Text>
+                            </View>
+                        )}
+                    </View>
                 </View>
-            </View>
-
+            )}
             {/* MODAL: EDIT ORDER or NEW ORDER (DigitalMenu) */}
             <Modal
                 visible={showMenuModal}
@@ -543,17 +1066,15 @@ export default function CashierStatusScreen() {
                             <Text style={styles.modalTitle}>
                                 {selectedSession.tableName || 'Editar Orden'}
                             </Text>
-                            <TouchableOpacity onPress={handleMenuClose} style={styles.closeModalBtn}>
-                                <Text style={styles.closeModalText}>Cerrar</Text>
+                            <TouchableOpacity onPress={handleMenuClose} style={styles.closeModalCircle}>
+                                <X size={24} color={colors.castIron} />
                             </TouchableOpacity>
                         </View>
-                        <DigitalMenuInterface
+                        <DigitalMenuInterfaceCashier
                             key={`menu-${selectedSession.id}`}
                             restaurantId={restaurantId}
                             tableId={selectedSession.tableId}
                             sessionId={selectedSession.id}
-                            mode="waiter"
-                            directSessionData={selectedSession.items}
                             onSuccess={() => {
                                 console.log('✅ [Cashier] Order updated successfully - live data will refresh automatically');
                             }}
@@ -585,7 +1106,7 @@ export default function CashierStatusScreen() {
                             mode="waiter"
                             onClose={() => setShowPaymentModal(false)}
                             onPaymentSuccess={handlePaymentSuccess}
-                            directSessionData={selectedSession} // Inject Data
+                            localSession={selectedSession} // Inject Data
                         />
                     </View>
                 )}
@@ -632,7 +1153,44 @@ export default function CashierStatusScreen() {
                     </View>
                 </View>
             </Modal>
-        </View>
+
+            {/* MODAL: NAME INPUT (For Counter Service) */}
+            <Modal
+                visible={showNameInputModal}
+                animationType="fade"
+                transparent={true}
+                onRequestClose={() => setShowNameInputModal(false)}
+            >
+                <View style={styles.tableSelectOverlay}>
+                    <View style={[styles.tableSelectModal, { height: 'auto', paddingBottom: 32 }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Customer Name</Text>
+                            <TouchableOpacity onPress={() => setShowNameInputModal(false)} style={styles.closeModalBtn}>
+                                <Text style={styles.closeModalText}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={{ padding: 24 }}>
+                            <Text style={{ marginBottom: 8, color: colors.gray, fontWeight: 'bold' }}>Who is this order for?</Text>
+                            <AirbnbInput
+                                label="Customer Name"
+                                value={newTableName} // Reusing newTableName state
+                                onChangeText={setNewTableName}
+                                placeholder="E.g. Alex, Order #42..."
+                                autoFocus
+                            />
+
+                            <TouchableOpacity
+                                style={[styles.logoutBtn, { backgroundColor: colors.roastedSaffron, marginTop: 24, justifyContent: 'center', width: '100%' }]}
+                                onPress={() => handleCreateCounterOrder(newTableName)}
+                            >
+                                <Text style={[styles.logoutText, { fontSize: 16 }]}>Start Order</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+        </View >
     );
 }
 
@@ -641,389 +1199,18 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: colors.oatCream,
     },
-    topBar: {
+    // Top Bar
+    header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        paddingHorizontal: spacing.lg,
+        paddingHorizontal: spacing.xl,
         paddingVertical: spacing.md,
         backgroundColor: colors.white,
         borderBottomWidth: 1,
         borderBottomColor: colors.lightGray,
         ...shadows.sm,
         zIndex: 10,
-    },
-    brandSection: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.xl,
-    },
-    brandSubtitle: {
-        fontSize: typography.lg,
-        fontWeight: typography.bold,
-        color: colors.castIron,
-    },
-    tabContainer: {
-        flexDirection: 'row',
-        backgroundColor: colors.offWhite,
-        borderRadius: borderRadius.lg,
-        padding: 4,
-    },
-    tab: {
-        paddingVertical: spacing.sm,
-        paddingHorizontal: spacing.lg,
-        borderRadius: borderRadius.md,
-    },
-    activeTab: {
-        backgroundColor: colors.white,
-        ...shadows.sm,
-    },
-    tabText: {
-        color: colors.gray,
-        fontWeight: typography.medium,
-    },
-    activeTabText: {
-        color: colors.roastedSaffron,
-        fontWeight: typography.bold,
-    },
-    splitLayout: {
-        flex: 1,
-        flexDirection: 'row',
-    },
-    leftPanel: {
-        flex: 3, // 60% approx
-        padding: spacing.lg,
-    },
-    rightPanel: {
-        flex: 2, // 40% approx
-        backgroundColor: colors.white,
-        borderLeftWidth: 1,
-        borderLeftColor: colors.lightGray,
-        ...shadows.lg, // Elevate the panel visually
-    },
-    gridContainer: {
-        paddingBottom: spacing.xl,
-    },
-    card: {
-        flex: 1,
-        backgroundColor: colors.white,
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        ...shadows.sm,
-        borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    selectedCard: {
-        borderColor: colors.roastedSaffron,
-        backgroundColor: '#FFF8F0',
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: spacing.sm,
-    },
-    tableTitle: {
-        fontSize: typography.lg,
-        fontWeight: typography.bold,
-        color: colors.castIron,
-    },
-    statusBadge: {
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 2,
-        borderRadius: borderRadius.rounded,
-    },
-    unpaid: {
-        backgroundColor: '#FEF3C7', // Light yellow
-    },
-    ready: {
-        backgroundColor: '#D1FAE5', // Light green
-    },
-    statusText: {
-        color: '#D97706',
-        fontSize: typography.xs,
-        fontWeight: typography.bold,
-        textTransform: 'uppercase',
-    },
-    cardInfo: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.xs,
-        marginBottom: spacing.md,
-    },
-    timeText: {
-        color: colors.gray,
-        fontSize: typography.sm,
-    },
-    cardFooter: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-end',
-    },
-    amount: {
-        fontSize: typography.xl,
-        fontWeight: typography.bold,
-        color: colors.castIron,
-    },
-    itemCount: {
-        color: colors.gray,
-        fontSize: typography.sm,
-    },
-    // Detail Panel
-    detailContent: {
-        flex: 1,
-    },
-    detailHeader: {
-        padding: spacing.lg,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.lightGray,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-    },
-    detailTitle: {
-        fontSize: typography.xxl,
-        fontWeight: typography.bold,
-        color: colors.castIron,
-    },
-    detailSubtitle: {
-        color: colors.gray,
-        fontSize: typography.sm,
-    },
-    printButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: colors.offWhite,
-        padding: spacing.sm,
-        borderRadius: borderRadius.md,
-        gap: spacing.xs,
-    },
-    printText: {
-        color: colors.castIron,
-        fontWeight: typography.medium,
-    },
-    itemsList: {
-        flex: 1,
-        padding: spacing.lg,
-    },
-    itemRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: spacing.md,
-    },
-    itemInfo: {
-        flexDirection: 'row',
-        gap: spacing.sm,
-        flex: 1,
-    },
-    qtyBadge: {
-        backgroundColor: colors.offWhite,
-        width: 24,
-        height: 24,
-        borderRadius: 4,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    qtyText: {
-        fontWeight: typography.bold,
-        fontSize: typography.xs,
-    },
-    itemName: {
-        fontSize: typography.base,
-        color: colors.castIron,
-        fontWeight: typography.medium,
-    },
-    itemNotes: {
-        fontSize: typography.xs,
-        color: colors.gray,
-        marginTop: 2,
-    },
-    itemPrice: {
-        fontWeight: typography.bold,
-        color: colors.castIron,
-    },
-    footerSection: {
-        padding: spacing.lg,
-        backgroundColor: colors.offWhite,
-        borderTopWidth: 1,
-        borderTopColor: colors.lightGray,
-    },
-    summaryRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: spacing.xs,
-    },
-    totalRow: {
-        marginTop: spacing.sm,
-        paddingTop: spacing.sm,
-        borderTopWidth: 1,
-        borderTopColor: colors.lightGray,
-        marginBottom: spacing.lg,
-    },
-    summaryLabel: {
-        color: colors.gray,
-    },
-    summaryValue: {
-        fontWeight: typography.medium,
-        color: colors.castIron,
-    },
-    totalLabel: {
-        fontSize: typography.xl,
-        fontWeight: typography.bold,
-        color: colors.castIron,
-    },
-    totalValue: {
-        fontSize: typography.xl,
-        fontWeight: typography.bold,
-        color: colors.roastedSaffron,
-    },
-    actions: {
-        flexDirection: 'row',
-        gap: spacing.md,
-    },
-    actionBtn: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: spacing.md,
-        borderRadius: borderRadius.lg,
-        gap: spacing.sm,
-        ...shadows.sm,
-    },
-    cashBtn: {
-        backgroundColor: '#10B981', // Emerald
-    },
-    cardBtn: {
-        backgroundColor: '#3B82F6', // Blue
-    },
-    menuBtn: {
-        backgroundColor: colors.offWhite,
-        borderWidth: 1,
-        borderColor: colors.lightGray,
-    },
-    payBtn: {
-        backgroundColor: colors.roastedSaffron, // Primary Action
-    },
-    actionBtnText: {
-        color: colors.white,
-        fontWeight: typography.bold,
-        fontSize: typography.lg,
-    },
-    emptyDetail: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    emptyDetailText: {
-        color: colors.gray,
-        fontSize: typography.lg,
-    },
-    emptyState: {
-        alignItems: 'center',
-        marginTop: spacing.xxxl,
-    },
-    emptyIconBg: {
-        width: 80,
-        height: 80,
-        borderRadius: 40,
-        backgroundColor: colors.offWhite,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: spacing.lg,
-    },
-    emptyText: {
-        fontSize: typography.xl,
-        fontWeight: typography.bold,
-        color: colors.castIron,
-    },
-    emptySubtext: {
-        color: colors.gray,
-        marginTop: spacing.xs,
-    },
-    // History Styles
-    listContainer: {
-        padding: spacing.lg,
-    },
-    historyRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        backgroundColor: colors.white,
-        padding: spacing.md,
-        borderRadius: borderRadius.md,
-        marginBottom: spacing.sm,
-        ...shadows.sm,
-    },
-    historyInfo: {
-        gap: 4,
-    },
-    historyTable: {
-        fontWeight: typography.bold,
-        color: colors.castIron,
-        fontSize: typography.base,
-    },
-    historyTime: {
-        color: colors.gray,
-        fontSize: typography.xs,
-    },
-    historyMeta: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: spacing.md,
-    },
-    historyAmount: {
-        fontWeight: typography.bold,
-        fontSize: typography.lg,
-        color: colors.albahaca,
-    },
-    miniPrintBtn: {
-        padding: 8,
-        backgroundColor: colors.offWhite,
-        borderRadius: borderRadius.sm,
-    },
-    // Available Table Card Styles
-    availableCard: {
-        backgroundColor: colors.offWhite,
-        borderStyle: 'dashed',
-        borderColor: colors.gray,
-        borderWidth: 1,
-        opacity: 0.8,
-    },
-    available: {
-        backgroundColor: colors.lightGray,
-    },
-    // Modal Styles
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: spacing.lg,
-        backgroundColor: colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.lightGray,
-    },
-    modalTitle: {
-        fontSize: typography.lg,
-        fontWeight: typography.bold,
-        color: colors.castIron,
-    },
-    closeModalBtn: {
-        padding: spacing.sm,
-    },
-    closeModalText: {
-        color: colors.roastedSaffron,
-        fontWeight: typography.bold,
-    },
-    // Header Styles
-    header: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        padding: spacing.lg,
-        backgroundColor: colors.white,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.lightGray,
-        paddingTop: Platform.OS === 'ios' ? 60 : spacing.lg,
     },
     headerTitle: {
         fontSize: typography.xl,
@@ -1035,18 +1222,392 @@ const styles = StyleSheet.create({
         color: colors.gray,
         marginTop: 2,
     },
+    tabContainer: {
+        flexDirection: 'row',
+        backgroundColor: colors.offWhite,
+        padding: 4,
+        borderRadius: borderRadius.lg,
+        gap: 4,
+    },
+    tab: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        borderRadius: borderRadius.md,
+    },
+    activeTab: {
+        backgroundColor: colors.white,
+        ...shadows.sm,
+    },
+    tabText: {
+        fontSize: typography.sm,
+        fontWeight: typography.medium,
+        color: colors.gray,
+    },
+    activeTabText: {
+        color: colors.roastedSaffron,
+        fontWeight: typography.bold,
+    },
     logoutBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: spacing.sm,
-        backgroundColor: colors.castIron,
-        borderRadius: borderRadius.md,
         gap: spacing.xs,
+        paddingHorizontal: spacing.md,
+        paddingVertical: spacing.sm,
+        backgroundColor: colors.roastedSaffron,
+        borderRadius: borderRadius.md,
     },
     logoutText: {
-        color: colors.white,
-        fontWeight: typography.medium,
         fontSize: typography.sm,
+        fontWeight: typography.bold,
+        color: colors.white,
+    },
+    // Layout
+    splitLayout: {
+        flex: 1,
+        flexDirection: 'row',
+        padding: spacing.lg,
+    },
+    leftPanel: {
+        flex: 0.65,
+        paddingRight: spacing.lg,
+        borderRightWidth: 1,
+        borderRightColor: colors.lightGray,
+    },
+    rightPanel: {
+        flex: 0.35,
+        paddingLeft: spacing.lg,
+    },
+    // Grid
+    gridContainer: {
+        paddingBottom: spacing.xxl,
+    },
+    card: {
+        width: '32%', // 3 columns
+        backgroundColor: colors.white,
+        borderRadius: borderRadius.lg,
+        marginBottom: spacing.md,
+        ...shadows.sm,
+        borderWidth: 1,
+        borderColor: 'transparent',
+    },
+    selectedCard: {
+        borderColor: colors.roastedSaffron,
+        transform: [{ scale: 1.02 }],
+        ...shadows.md,
+    },
+    cardHeader: {
+        padding: spacing.md,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        borderBottomWidth: 1,
+        borderBottomColor: colors.offWhite,
+    },
+    // Card Styles
+    tableTitle: {
+        fontSize: typography.lg,
+        fontWeight: typography.bold,
+        color: colors.castIron,
+    },
+    statusBadge: {
+        paddingHorizontal: spacing.xs,
+        paddingVertical: 2,
+        borderRadius: borderRadius.sm,
+    },
+    unpaid: { backgroundColor: '#FEF3C7' },
+    paid: { backgroundColor: '#D1FAE5' },
+    ready: { backgroundColor: '#D1FAE5' },
+    statusText: {
+        fontSize: 10,
+        fontWeight: typography.bold,
+        color: colors.castIron,
+        textTransform: 'uppercase',
+    },
+    cardInfo: {
+        padding: spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+    },
+    timeText: {
+        color: colors.gray,
+        fontSize: typography.sm,
+    },
+    cardFooter: {
+        padding: spacing.md,
+        backgroundColor: colors.offWhite,
+        borderBottomLeftRadius: borderRadius.lg,
+        borderBottomRightRadius: borderRadius.lg,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    amount: {
+        fontSize: typography.lg,
+        fontWeight: typography.bold,
+        color: colors.castIron,
+    },
+    itemCount: {
+        fontSize: typography.sm,
+        color: colors.gray,
+    },
+    // Styles for Detail Panel
+    detailContent: {
+        flex: 1,
+        backgroundColor: colors.white,
+        borderRadius: borderRadius.lg,
+        ...shadows.md,
+        overflow: 'hidden',
+    },
+    detailHeader: {
+        padding: spacing.lg,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.lightGray,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    detailTitle: {
+        fontSize: typography.xl,
+        fontWeight: typography.bold,
+        color: colors.castIron,
+    },
+    detailSubtitle: {
+        fontSize: typography.sm,
+        color: colors.gray,
+    },
+    printButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        padding: 8,
+        backgroundColor: colors.offWhite,
+        borderRadius: 8,
+    },
+    printText: { fontSize: 12, fontWeight: 'bold', color: colors.castIron },
+    itemsList: {
+        flex: 1,
+        padding: spacing.lg,
+    },
+    itemRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 12,
+        alignItems: 'flex-start',
+    },
+    itemInfo: {
+        flexDirection: 'row',
+        gap: 8,
+        flex: 1,
+    },
+    qtyBadge: {
+        backgroundColor: colors.offWhite,
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 4,
+        alignSelf: 'flex-start',
+    },
+    qtyText: { fontWeight: 'bold', fontSize: 12 },
+    itemName: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: colors.castIron,
+    },
+    itemNotes: {
+        fontSize: 12,
+        color: colors.gray,
+        fontStyle: 'italic',
+        marginTop: 2,
+    },
+    itemPrice: {
+        fontWeight: 'bold',
+        fontSize: 14,
+        color: colors.castIron,
+        marginLeft: 8,
+    },
+    footerSection: {
+        padding: spacing.lg,
+        borderTopWidth: 1,
+        borderTopColor: colors.lightGray,
+        backgroundColor: colors.offWhite,
+    },
+    summaryRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 4,
+    },
+    summaryLabel: { color: colors.gray, fontSize: 14 },
+    summaryValue: { fontWeight: '500', fontSize: 14 },
+    totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: colors.lightGray,
+        marginBottom: 16,
+    },
+    totalLabel: { fontSize: 18, fontWeight: 'bold' },
+    totalValue: { fontSize: 18, fontWeight: 'bold', color: colors.roastedSaffron },
+    actions: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    actionBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 12,
+        borderRadius: 8,
+        gap: 8,
+    },
+    menuBtn: {
+        backgroundColor: colors.white,
+        borderWidth: 1,
+        borderColor: colors.lightGray,
+    },
+    payBtn: {
+        backgroundColor: colors.roastedSaffron,
+        ...shadows.sm,
+    },
+    actionBtnText: {
+        fontWeight: 'bold',
+        fontSize: 14,
+        color: 'white',
+    },
+    emptyDetail: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyDetailText: {
+        color: colors.gray,
+        fontSize: 16,
+    },
+    emptyState: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: 60,
+    },
+    emptyIconBg: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: colors.offWhite,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
+    },
+    emptyText: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: colors.castIron,
+    },
+    emptySubtext: {
+        color: colors.gray,
+        marginTop: 4,
+    },
+
+    // Modals
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 24,
+        borderBottomWidth: 1,
+        borderBottomColor: '#eee',
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontWeight: 'bold',
+    },
+    closeModalCircle: {
+        padding: 4,
+    },
+
+    // KPI / Shift Dashboard Styles
+    kpiCard: {
+        padding: 20,
+        borderRadius: 12,
+        ...shadows.sm,
+        justifyContent: 'center'
+    },
+    kpiTitle: {
+        fontSize: 12,
+        color: colors.gray,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5
+    },
+    kpiValue: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        marginTop: 8
+    },
+    kpiSubtitle: {
+        fontSize: 12,
+        color: colors.gray,
+        marginTop: 4
+    },
+    breakdownLabel: {
+        fontSize: 11,
+        color: colors.gray,
+        marginBottom: 2
+    },
+    breakdownValue: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: colors.castIron
+    },
+
+    // History Modal List
+    historyRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 12,
+        backgroundColor: '#f9fafb',
+        borderRadius: 8,
+        marginBottom: 8,
+    },
+    historyInfo: {},
+    historyTable: { fontWeight: 'bold', fontSize: 14, marginBottom: 2 },
+    historyTime: { fontSize: 12, color: colors.gray },
+    historyMeta: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+    historyAmount: { fontWeight: 'bold', fontSize: 16, color: '#059669' },
+    miniPrintBtn: {
+        padding: 6,
+        backgroundColor: '#fff',
+        borderRadius: 4,
+        borderWidth: 1,
+        borderColor: '#e5e7eb'
+    },
+
+    // Capacity Badge
+    capacityBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        borderWidth: 1,
+        marginTop: 4,
+        backgroundColor: colors.white,
+        alignSelf: 'flex-start',
+    },
+    capacityDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        marginRight: 6,
+    },
+    capacityText: {
+        fontSize: 11,
+        fontWeight: 'bold',
     },
     // Table Selection Modal Styles
     tableSelectOverlay: {
@@ -1090,28 +1651,6 @@ const styles = StyleSheet.create({
         fontSize: typography.xs,
         fontWeight: typography.bold,
     },
-    // Capacity Counter Styles
-    capacityBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: spacing.sm,
-        paddingVertical: 4,
-        borderRadius: borderRadius.lg,
-        borderWidth: 1.5,
-        marginTop: spacing.sm,
-        backgroundColor: colors.offWhite,
-        alignSelf: 'flex-start',
-    },
-    capacityDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        marginRight: spacing.sm,
-    },
-    capacityText: {
-        fontSize: 12,
-        fontWeight: typography.bold,
-    },
     // New Table Selector Styles
     tableSelectorBtn: {
         flex: 1,
@@ -1135,4 +1674,15 @@ const styles = StyleSheet.create({
         marginTop: 4,
         fontWeight: typography.bold,
     },
+    closeModalBtn: {
+        padding: spacing.sm,
+    },
+    closeModalText: {
+        color: colors.roastedSaffron,
+        fontWeight: typography.bold,
+    },
+    listContainer: {
+        padding: spacing.lg,
+    },
 });
+

@@ -59,7 +59,7 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
     const [clientName, setClientName] = useState('');
 
     // Shared Session State
-    const [sessionItems, setSessionItems] = useState<OrderItem[]>([]);
+    const [sessionItems, setSessionItems] = useState<OrderItem[]>(directSessionData || []);
     const [sessionTotal, setSessionTotal] = useState(0);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
     const [activeSession, setActiveSession] = useState<Session | null>(null);
@@ -98,7 +98,7 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                 });
                 unsubsRef.current.push(unsubConfig);
 
-                if (tableId) {
+                if (tableId && tableId !== 'counter') {
                     const unsubSession = subscribeToActiveSession(restaurantId, tableId, (items, total, sessionId, session) => {
                         setSessionItems(items);
                         setSessionTotal(total);
@@ -107,6 +107,20 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                     });
                     unsubsRef.current.push(unsubSession);
                 }
+
+                // [ADD] If we have a sessionId but no table subscription (e.g., Counter Mode),
+                // subscribe to the session directly for live updates.
+                if (tableId === 'counter' && currentSessionId) {
+                    const unsubSession = subscribeToSession(currentSessionId, (session) => {
+                        if (session) {
+                            setActiveSession(session);
+                            setSessionItems(session.items || []);
+                            setSessionTotal(session.total || 0);
+                        }
+                    }, restaurantId);
+                    unsubsRef.current.push(unsubSession);
+                }
+
                 setLoading(false);
             } catch (e) {
                 console.error(e);

@@ -87,6 +87,8 @@ export interface RestaurantSettings {
         enabled: boolean;
         radius_meters: number;
     };
+    serviceType?: 'counter' | 'table';
+    require_guest_name?: boolean;
 }
 
 // ============================================
@@ -229,6 +231,13 @@ export interface Session {
     guestCount?: number;
     staff?: SessionStaff[];
     staff_ids?: string[];
+    notes?: string;
+    payment_breakdown?: {
+        cash?: number;
+        card?: number;
+        transfer?: number;
+        other?: number;
+    };
 }
 
 export interface Order {
