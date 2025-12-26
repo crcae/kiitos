@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Switch, Alert, Modal, Image, Platform, TextInput, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ArrowLeft, Clock, MapPin, Palette, Globe, QrCode, Info, X, ExternalLink, UtensilsCrossed, ShoppingBag } from 'lucide-react-native';
+import { ArrowLeft, Clock, MapPin, Palette, Globe, QrCode, Info, X, ExternalLink, UtensilsCrossed, ShoppingBag, Store, Camera } from 'lucide-react-native';
 
 import { useRouter } from 'expo-router';
 import AirbnbButton from '../../../src/components/AirbnbButton';
@@ -10,7 +10,7 @@ import AirbnbCard from '../../../src/components/AirbnbCard';
 import { colors, spacing, typography } from '../../../src/styles/theme';
 import { useAuth } from '../../../src/context/AuthContext';
 import { useRestaurant } from '../../../src/hooks/useRestaurant';
-import { subscribeToRestaurantConfig, updateRestaurantConfig } from '../../../src/services/menu';
+import { subscribeToRestaurantConfig, updateRestaurantConfig, updateRestaurant } from '../../../src/services/menu';
 import { uploadImage } from '../../../src/services/storage';
 import * as ImagePicker from 'expo-image-picker';
 import QRCode from 'react-native-qrcode-svg';
@@ -25,6 +25,21 @@ const DAYS = [
     { key: 'fri', label: 'Viernes' },
     { key: 'sat', label: 'Sábado' },
     { key: 'sun', label: 'Domingo' },
+];
+
+const MARKETPLACE_CATEGORIES = [
+    { id: 'burger', name: 'Burgers', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&q=80' },
+    { id: 'pizza', name: 'Pizza', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200&q=80' },
+    { id: 'sushi', name: 'Sushi', image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=200&q=80' },
+    { id: 'tacos', name: 'Tacos', image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=200&q=80' },
+    { id: 'asian', name: 'Asian', image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=200&q=80' },
+    { id: 'italian', name: 'Italian', image: 'https://images.unsplash.com/photo-1498579150354-977475b7ea0b?w=200&q=80' },
+    { id: 'healthy', name: 'Healthy/Salad', image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&q=80' },
+    { id: 'breakfast', name: 'Breakfast/Brunch', image: 'https://images.unsplash.com/photo-1533089862017-d5d9b53d53b9?w=200&q=80' },
+    { id: 'coffee', name: 'Coffee', image: 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=200&q=80' },
+    { id: 'dessert', name: 'Dessert', image: 'https://images.unsplash.com/photo-1563729768-b652c672e843?w=200&q=80' },
+    { id: 'wings', name: 'Wings', image: 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f?w=200&q=80' },
+    { id: 'sandwiches', name: 'Sandwiches', image: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=200&q=80' },
 ];
 
 export default function SettingsScreen() {
@@ -49,11 +64,76 @@ export default function SettingsScreen() {
         radius_meters: 1000 // Default 1km
     });
 
+    const [isVisibleInMarketplace, setIsVisibleInMarketplace] = useState(false);
+    const [marketplaceSettings, setMarketplaceSettings] = useState<{
+        coverImage?: string;
+        prepTime?: string;
+        categories?: string[];
+    }>({});
+
     // UI State
     const [uploading, setUploading] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [lastSaved, setLastSaved] = useState<Date | null>(null);
     const [qrModalVisible, setQrModalVisible] = useState(false);
+
+    // New: Local Name State
+    const [restaurantName, setRestaurantName] = useState('');
+    const debouncedName = useDebounce(restaurantName, 1000);
+
+    // Initial Load - Set Name
+    useEffect(() => {
+        if (restaurant && restaurant.name && restaurantName === '') {
+            setRestaurantName(restaurant.name);
+        }
+    }, [restaurant]);
+
+    // Save Name Effect
+    useEffect(() => {
+        if (!restaurantId || isInitialLoad || !debouncedName) return;
+
+        // Only save if different from DB to prevent loops
+        if (restaurant && debouncedName !== restaurant.name) {
+            console.log("Auto-saving name:", debouncedName);
+            setIsSaving(true);
+            updateRestaurant(restaurantId, { name: debouncedName })
+                .then(() => {
+                    setLastSaved(new Date());
+                    setIsSaving(false);
+                    // Alert.alert("Success", "Name saved."); // Optional: remove alert for seamless auto-save
+                })
+                .catch(err => {
+                    console.error("Name save error:", err);
+                    setIsSaving(false);
+                });
+        }
+    }, [debouncedName]);
+
+    // New: Debounce Prep Time
+    const debouncedPrepTime = useDebounce(marketplaceSettings.prepTime, 1500);
+
+    // Save Prep Time Effect
+    useEffect(() => {
+        if (!restaurantId || isInitialLoad || !debouncedPrepTime) return;
+
+        const currentDbVal = restaurant?.settings?.marketplaceSettings?.prepTime;
+        if (debouncedPrepTime !== currentDbVal) {
+            console.log("Auto-saving prep time:", debouncedPrepTime);
+            // We need to pass the FULL marketplaceSettings including this new prepTime
+            // actually marketplaceSettings state already has it.
+            // But be careful of stale closures if we use 'marketplaceSettings' from scope?
+            // autoSave uses its arg to merge.
+            // But wait, autoSave logic: updateRestaurantConfig(id, updates).
+            // updates = { marketplaceSettings: ... }
+            // If I just pass { marketplaceSettings }, it uses the CURRENT state 'marketplaceSettings' which has the new prepTime?
+            // Yes, because this effect runs when debouncedPrepTime changes, which tracks state.
+            // But to be safe, construct it.
+
+            const newSettings = { ...marketplaceSettings, prepTime: debouncedPrepTime };
+            autoSave({ marketplaceSettings: newSettings });
+        }
+    }, [debouncedPrepTime]);
+
     const [brandingModalVisible, setBrandingModalVisible] = useState(false);
 
     // Initial load tracking to prevent auto-saving on first mount
@@ -95,6 +175,8 @@ export default function SettingsScreen() {
             if (config.location_restriction) {
                 setLocationRestriction(config.location_restriction);
             }
+            setIsVisibleInMarketplace(config.isVisibleInMarketplace ?? false);
+            setMarketplaceSettings(config.marketplaceSettings || {});
             setIsInitialLoad(false);
         });
 
@@ -108,8 +190,9 @@ export default function SettingsScreen() {
             setIsSaving(true);
             await updateRestaurantConfig(restaurantId, updates);
             setLastSaved(new Date());
-        } catch (e) {
+        } catch (e: any) {
             console.error('Auto-save error:', e);
+            Alert.alert("Auto-Save Error", e.message);
         } finally {
             setIsSaving(false);
         }
@@ -182,6 +265,58 @@ export default function SettingsScreen() {
         }
     };
 
+    const pickCoverImage = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: true,
+            aspect: [16, 9],
+            quality: 0.7,
+        });
+
+        if (!result.canceled) {
+            const localUri = result.assets[0].uri;
+
+            // Optimistic update
+            const newSettings = { ...marketplaceSettings, coverImage: localUri };
+            setMarketplaceSettings(newSettings);
+
+            if (restaurantId) {
+                try {
+                    setUploading(true);
+                    setIsSaving(true);
+                    const filename = `marketplace/cover_${Date.now()}.jpg`;
+                    const coverUrl = await uploadImage(localUri, `restaurants/${restaurantId}/${filename}`);
+
+                    const finalSettings = { ...newSettings, coverImage: coverUrl };
+                    setMarketplaceSettings(finalSettings);
+
+                    await updateRestaurantConfig(restaurantId, {
+                        marketplaceSettings: finalSettings
+                    });
+                    setLastSaved(new Date());
+                } catch (e) {
+                    console.error('Cover upload error:', e);
+                    Alert.alert('Error', 'No se pudo subir la imagen de portada');
+                } finally {
+                    setUploading(false);
+                    setIsSaving(false);
+                }
+            }
+        }
+    };
+
+    const toggleCategory = (cat: string) => {
+        const currentCats = marketplaceSettings.categories || [];
+        let newCats;
+        if (currentCats.includes(cat)) {
+            newCats = currentCats.filter(c => c !== cat);
+        } else {
+            newCats = [...currentCats, cat];
+        }
+        const newSettings = { ...marketplaceSettings, categories: newCats };
+        setMarketplaceSettings(newSettings);
+        autoSave({ marketplaceSettings: newSettings });
+    };
 
     const fetchCoordinates = async () => {
         if (!googlePlaceId) {
@@ -262,6 +397,27 @@ export default function SettingsScreen() {
             </View>
 
             <ScrollView className="flex-1 px-6 py-4">
+                {/* NAME & GENERAL */}
+                <View className="mb-8">
+                    <View className="flex-row items-center mb-4">
+                        <Store size={20} color="#6366f1" className="mr-2" />
+                        <Text className="text-lg font-bold text-white">General</Text>
+                    </View>
+                    <AirbnbCard variant="dark">
+                        <View className="mb-4">
+                            <Text className="text-white font-medium mb-1">Nombre del Restaurante</Text>
+                            <Text className="text-slate-400 text-xs mb-3">Este nombre será visible en el Marketplace y tickets.</Text>
+                            <TextInput
+                                className="bg-slate-800 text-white px-4 py-3 rounded-xl border border-slate-700 font-bold text-lg"
+                                value={restaurantName}
+                                onChangeText={setRestaurantName}
+                                placeholder="Nombre del Restaurante"
+                                placeholderTextColor="#64748b"
+                            />
+                        </View>
+                    </AirbnbCard>
+                </View>
+
                 {/* OPERATION MODEL */}
                 <View className="mb-8">
                     <View className="flex-row items-center mb-4">
@@ -324,6 +480,8 @@ export default function SettingsScreen() {
                         </View>
                     )}
                 </View>
+
+
 
                 {/* General Settings */}
                 <View className="mb-8">
@@ -409,14 +567,14 @@ export default function SettingsScreen() {
                                 />
                             </View>
 
-                            {/* Takeout QR Section Moved Here */}
+                            {/* Takeout QR and Config Section */}
                             {enableTakeout && (
                                 <View className="mt-4 pt-4 border-t border-slate-700/50">
                                     <View className="flex-row items-center mb-4">
                                         <QrCode size={18} color="#ea580c" className="mr-2" />
                                         <Text className="text-sm font-bold text-white">QR Takeout</Text>
                                     </View>
-                                    <View className="items-center bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                                    <View className="items-center bg-slate-800/50 p-4 rounded-xl border border-slate-700 mb-6">
                                         <View className="bg-white p-3 rounded-xl mb-4">
                                             <QRCode
                                                 value={`${Platform.OS === 'web' ? window.location.origin : 'https://kiitos-app.web.app'}/takeout/${restaurantId}`}
@@ -433,6 +591,113 @@ export default function SettingsScreen() {
                                             <Text className="text-indigo-400 font-bold text-xs italic">Ver pantalla completa</Text>
                                         </TouchableOpacity>
                                     </View>
+
+                                    {/* MARKETPLACE CONFIG SUB-SECTION */}
+                                    <View className="flex-row items-center justify-between mb-4 mt-2">
+                                        <View>
+                                            <Text className="text-white font-medium">Visible en el Marketplace</Text>
+                                            <Text className="text-slate-400 text-xs">Muestra tu restaurante en la app de consumidores</Text>
+                                        </View>
+                                        <Switch
+                                            trackColor={{ false: "#334155", true: "#059669" }}
+                                            thumbColor={isVisibleInMarketplace ? "#ffffff" : "#cbd5e1"}
+                                            onValueChange={(val) => {
+                                                setIsVisibleInMarketplace(val);
+                                                autoSave({ isVisibleInMarketplace: val });
+                                            }}
+                                            value={isVisibleInMarketplace}
+                                        />
+                                    </View>
+
+                                    {/* Conditional Form */}
+                                    {isVisibleInMarketplace && (
+                                        <View className="bg-slate-800/30 p-4 rounded-xl border border-slate-700/50">
+
+                                            {/* Cover Image & Prep Time Row */}
+                                            <View className="flex-row mb-6">
+                                                {/* Compact Cover Image */}
+                                                <TouchableOpacity
+                                                    onPress={pickCoverImage}
+                                                    className="mr-6 items-center"
+                                                >
+                                                    <View className="w-24 h-24 rounded-2xl bg-slate-800 border border-slate-700 overflow-hidden items-center justify-center relative shadow-sm">
+                                                        {marketplaceSettings.coverImage ? (
+                                                            <Image source={{ uri: marketplaceSettings.coverImage }} className="w-full h-full" resizeMode="cover" />
+                                                        ) : (
+                                                            <Camera size={32} color="#64748b" />
+                                                        )}
+                                                        {/* Edit Badge */}
+                                                        <View className="absolute bottom-0 right-0 left-0 bg-black/60 py-1 items-center">
+                                                            <Text className="text-white text-[10px] font-bold">EDITAR</Text>
+                                                        </View>
+                                                    </View>
+                                                    <Text className="text-white text-xs font-medium mt-2">Portada (16:9)</Text>
+                                                </TouchableOpacity>
+
+                                                {/* Prep Time Input */}
+                                                <View className="flex-1 justify-center">
+                                                    <Text className="text-white font-medium mb-2">Tiempo de Preparación</Text>
+                                                    <View className="flex-row items-center bg-slate-800 rounded-xl border border-slate-700 px-4 h-12">
+                                                        <Clock size={16} color="#94a3b8" className="mr-2" />
+                                                        <TextInput
+                                                            className="flex-1 text-white font-bold text-lg h-full"
+                                                            placeholder="20"
+                                                            placeholderTextColor="#475569"
+                                                            keyboardType="numeric"
+                                                            value={marketplaceSettings.prepTime?.replace(/[^0-9]/g, '') || ''}
+                                                            onChangeText={(t) => {
+                                                                const numeric = t.replace(/[^0-9]/g, '');
+                                                                const newSettings = { ...marketplaceSettings, prepTime: numeric ? `${numeric} min` : '' };
+                                                                setMarketplaceSettings(newSettings);
+                                                            }}
+                                                        // onEndEditing removed in favor of debounced auto-save
+                                                        />
+                                                        <Text className="text-slate-500 font-medium ml-1">min</Text>
+                                                    </View>
+                                                    <Text className="text-slate-500 text-xs mt-1">Promedio estimado por orden</Text>
+                                                </View>
+                                            </View>
+
+                                            {/* Categories */}
+                                            <Text className="text-white font-medium mb-3">Categoría Principal (Selecciona multiples)</Text>
+                                            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="-mx-2 px-2">
+                                                <View className="flex-row gap-4 mb-2">
+                                                    {MARKETPLACE_CATEGORIES.map(cat => {
+                                                        const isSelected = marketplaceSettings.categories?.includes(cat.name);
+                                                        return (
+                                                            <TouchableOpacity
+                                                                key={cat.id}
+                                                                onPress={() => toggleCategory(cat.name)}
+                                                                className="items-center"
+                                                                style={{ width: 70 }}
+                                                            >
+                                                                <View className={`w-16 h-16 rounded-full overflow-hidden mb-2 border-2 ${isSelected ? 'border-orange-500' : 'border-transparent'}`}>
+                                                                    <Image
+                                                                        source={{ uri: cat.image }}
+                                                                        className={`w-full h-full ${isSelected ? 'opacity-100' : 'opacity-60'}`}
+                                                                        resizeMode="cover"
+                                                                    />
+                                                                    {isSelected && (
+                                                                        <View className="absolute inset-0 bg-orange-500/20 items-center justify-center">
+                                                                            <View className="bg-orange-500 rounded-full p-1">
+                                                                                <UtensilsCrossed size={10} color="white" />
+                                                                            </View>
+                                                                        </View>
+                                                                    )}
+                                                                </View>
+                                                                <Text
+                                                                    numberOfLines={1}
+                                                                    className={`text-[10px] text-center w-full ${isSelected ? 'text-orange-400 font-bold' : 'text-slate-400'}`}
+                                                                >
+                                                                    {cat.name}
+                                                                </Text>
+                                                            </TouchableOpacity>
+                                                        )
+                                                    })}
+                                                </View>
+                                            </ScrollView>
+                                        </View>
+                                    )}
                                 </View>
                             )}
                         </View>

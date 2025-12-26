@@ -136,9 +136,24 @@ export const subscribeToRestaurantConfig = (restaurantId: string, callback: (con
 };
 
 export const updateRestaurantConfig = async (restaurantId: string, settings: Partial<RestaurantSettings>) => {
-    const docRef = doc(db, 'restaurants', restaurantId);
-    // Use setDoc with merge: true but with a proper nested object structure
-    // NOT dot notation keys, which creates "settings.key" fields literal
-    const updates = { settings: settings };
-    await setDoc(docRef, updates, { merge: true });
+    try {
+        const docRef = doc(db, 'restaurants', restaurantId);
+        const updates = { settings: settings };
+        console.log(`[updateRestaurantConfig] Updating ${restaurantId} with`, updates);
+        await setDoc(docRef, updates, { merge: true });
+    } catch (error) {
+        console.error("Error in updateRestaurantConfig:", error);
+        throw error;
+    }
+};
+
+export const updateRestaurant = async (restaurantId: string, updates: any) => {
+    try {
+        console.log(`[updateRestaurant] Updating ${restaurantId} with`, updates);
+        const docRef = doc(db, 'restaurants', restaurantId);
+        await updateDoc(docRef, updates); // Use updateDoc to ensure document exists
+    } catch (error) {
+        console.error("Error in updateRestaurant:", error);
+        throw error;
+    }
 };
