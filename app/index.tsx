@@ -1,5 +1,5 @@
-import { Redirect } from "expo-router";
-import { Platform } from "react-native";
+import { Redirect, Link } from "expo-router";
+import { Platform, View, Text, TouchableOpacity } from "react-native";
 import LandingPage from "./landing";
 // import { useAuth } from "../src/context/AuthContext"; // Descomentar cuando quieras usar auth real
 
@@ -18,10 +18,14 @@ export default function Index() {
     // const userIsLoggedIn = !!user;
     const userIsLoggedIn = false;
 
-    if (userIsLoggedIn) {
-        return <Redirect href="/(app)/marketplace" />;
-    } else {
-        // En móvil, vamos directo al marketplace como pidió el usuario
-        return <Redirect href="/(app)/marketplace" />;
-    }
+    return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: 20 }}>
+            <Redirect href="/(app)/marketplace" />
+            <Link href="/test/kushki" asChild>
+                <TouchableOpacity style={{ backgroundColor: '#DC2626', padding: 15, borderRadius: 8 }}>
+                    <Text style={{ color: 'white', fontWeight: 'bold' }}>Go to Kushki Test (DEV ONLY)</Text>
+                </TouchableOpacity>
+            </Link>
+        </View>
+    );
 }
