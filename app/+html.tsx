@@ -11,14 +11,14 @@ export default function Root({ children }: PropsWithChildren) {
                 <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
 
                 {/* 1. Standard SEO */}
-                <title>Kitos - Escanea, Ordena y Paga.</title>
-                <meta name="description" content="La forma más rápida de pedir en restaurantes. Escanea el código QR de tu mesa, ordena y paga sin esperas. También llevamos tu comida a domicilio." />
+                <title>Kitos - Escanea, Ordena y Paga</title>
+                <meta name="description" content="La forma más rápida de pedir en restaurantes. Escanea el código QR de tu mesa y paga sin esperas." />
                 <meta name="keywords" content="restaurantes, menu digital, qr, ordenar, pagar, delivery, mexico, comida" />
 
                 {/* 2. Open Graph / Facebook / WhatsApp */}
                 <meta property="og:type" content="website" />
-                <meta property="og:title" content="Kitos - Escanea, Ordena y Paga." />
-                <meta property="og:description" content="La forma más rápida de pedir en restaurantes. Escanea el código QR de tu mesa, ordena y paga sin esperas." />
+                <meta property="og:title" content="Kitos - Escanea, Ordena y Paga" />
+                <meta property="og:description" content="La forma más rápida de pedir en restaurantes. Escanea el código QR de tu mesa y paga sin esperas." />
                 <meta property="og:image" content="https://kitos.app/social-preview.png" />
                 <meta property="og:url" content="https://kitos.app" />
                 <meta property="og:site_name" content="Kitos" />
