@@ -2,8 +2,9 @@ import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react'
 import { View, Text, TextInput, TouchableOpacity, Image, ActivityIndicator, Dimensions, Linking, Alert, Vibration } from 'react-native';
 import { useRouter, useNavigation, usePathname } from 'expo-router';
 import { Search, MapPin, Star, ChevronDown, Clock, Camera as CameraIcon, ShoppingBag, ScanLine, User } from 'lucide-react-native';
-import { collection, getDocs, query } from 'firebase/firestore';
+import { collection, getDocs, query, where } from 'firebase/firestore';
 import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import * as Location from 'expo-location';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomSheet, { BottomSheetScrollView } from '@gorhom/bottom-sheet';
@@ -15,13 +16,20 @@ import { useMarketStore } from '../../../src/store/marketStore';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Mock Data for Categories (Static)
+// Mock Data for Categories (updated to match Admin Settings)
 const CATEGORIES = [
-    { id: '1', name: 'Burgers', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&q=80' },
-    { id: '2', name: 'Pizza', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200&q=80' },
-    { id: '3', name: 'Sushi', image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=200&q=80' },
-    { id: '4', name: 'Tacos', image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=200&q=80' },
-    { id: '5', name: 'Dessert', image: 'https://images.unsplash.com/photo-1563729768-b652c672e843?w=200&q=80' },
+    { id: 'burger', name: 'Burgers', image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=200&q=80' },
+    { id: 'pizza', name: 'Pizza', image: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=200&q=80' },
+    { id: 'sushi', name: 'Sushi', image: 'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=200&q=80' },
+    { id: 'tacos', name: 'Tacos', image: 'https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=200&q=80' },
+    { id: 'asian', name: 'Asian', image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?w=200&q=80' },
+    { id: 'italian', name: 'Italian', image: 'https://images.unsplash.com/photo-1498579150354-977475b7ea0b?w=200&q=80' },
+    { id: 'healthy', name: 'Healthy/Salad', image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=200&q=80' },
+    { id: 'breakfast', name: 'Breakfast/Brunch', image: 'https://images.unsplash.com/photo-1533089862017-d5d9b53d53b9?w=200&q=80' },
+    { id: 'coffee', name: 'Coffee', image: 'https://images.unsplash.com/photo-1497935586351-b67a49e012bf?w=200&q=80' },
+    { id: 'dessert', name: 'Dessert', image: 'https://images.unsplash.com/photo-1563729768-b652c672e843?w=200&q=80' },
+    { id: 'wings', name: 'Wings', image: 'https://images.unsplash.com/photo-1567620832903-9fc6debc209f?w=200&q=80' },
+    { id: 'sandwiches', name: 'Sandwiches', image: 'https://images.unsplash.com/photo-1528735602780-2552fd46c7af?w=200&q=80' },
 ];
 
 const FILTERS = ['Sort', 'Top Rated', 'Fast Delivery', 'Under 30 min', 'Price: Low to High'];
@@ -38,6 +46,7 @@ export default function MarketplaceHome() {
     const [activeFilter, setActiveFilter] = useState('Sort');
     const isFocused = useIsFocused();
     const [sheetIndex, setSheetIndex] = useState(0);
+    const [userLocation, setUserLocation] = useState<Location.LocationObject | null>(null);
 
     // BottomSheet Ref
     const bottomSheetRef = useRef<BottomSheet>(null);
@@ -100,6 +109,16 @@ export default function MarketplaceHome() {
         if (!permission) {
             requestPermission();
         }
+
+        // Request Location Permissions
+        (async () => {
+            let { status } = await Location.requestForegroundPermissionsAsync();
+            if (status === 'granted') {
+                let location = await Location.getCurrentPositionAsync({});
+                setUserLocation(location);
+            }
+        })();
+
         fetchRestaurants();
     }, [permission]);
 
@@ -109,15 +128,40 @@ export default function MarketplaceHome() {
             const querySnapshot = await getDocs(q);
 
             const fetched: MarketplaceRestaurant[] = [];
-            querySnapshot.forEach((doc) => {
+
+            // Use Promise.all to fetch reviews in parallel
+            await Promise.all(querySnapshot.docs.map(async (doc) => {
                 const data = doc.data() as any;
+
+                // Fetch reviews for this restaurant
+                let averageRating = 5.0; // Default new
+                let reviewCount = 0;
+
+                try {
+                    const reviewsQuery = query(
+                        collection(db, 'reviews'),
+                        where('restaurantId', '==', doc.id)
+                    );
+                    const reviewsSnap = await getDocs(reviewsQuery);
+
+                    if (!reviewsSnap.empty) {
+                        const total = reviewsSnap.docs.reduce((acc, rDoc) => acc + (rDoc.data().rating || 0), 0);
+                        reviewCount = reviewsSnap.size;
+                        averageRating = total / reviewCount;
+                    }
+                } catch (e) {
+                    console.log(`Error fetching reviews for ${doc.id}:`, e);
+                }
+
+                // Push to array
                 fetched.push({
                     ...data,
                     id: doc.id,
-                    distance: '1.2 km', // Mock
-                    rating: 4.5 // Mock
+                    distance: '1.2 km', // Mock logic for now
+                    rating: Number(averageRating.toFixed(1))
                 });
-            });
+            }));
+
             setRestaurants(fetched);
         } catch (error) {
             console.error("Error fetching restaurants:", error);
@@ -128,6 +172,10 @@ export default function MarketplaceHome() {
 
     const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
         if (scanned || !isFocused || sheetIndex !== 0 || isProcessingScan.current) return;
+
+        // ... (Existing QR logic remains same, omitting for brevity in replace block if possible, but tool requires contiguous block)
+        // Since I need to replace the whole logic for displayedRestaurants later, I have to include this or make a smaller replacement.
+        // I will include the logic as it was to be safe.
 
         isProcessingScan.current = true;
         setScanned(true);
@@ -191,9 +239,6 @@ export default function MarketplaceHome() {
                 return;
             }
 
-            // Navigation happens, state will be reset when coming back to focus
-            // Removed automatic setTimeout reset to avoid race conditions
-
         } catch (error) {
             console.warn("QR Scan Error:", error);
             Alert.alert("Error", "Could not process this QR code.", [
@@ -203,16 +248,24 @@ export default function MarketplaceHome() {
     };
 
     const displayedRestaurants = useMemo(() => {
+        // 1. Filter by Search Query
         let result = restaurants.filter(r =>
             r.name && r.name.toLowerCase().includes(searchQuery.toLowerCase())
         );
 
+        // 2. Filter by Visibility Settings (NEW)
+        result = result.filter(r => {
+            const settings = r.settings as any; // Cast to access custom fields
+            return settings?.isVisibleInMarketplace === true;
+        });
+
+        // 3. Filter by Category (NEW)
         if (selectedCategory) {
             result = result.filter(r => {
-                const restaurant = r as any;
-                return (restaurant.categories && restaurant.categories.includes(selectedCategory)) ||
-                    (restaurant.type && restaurant.type.toLowerCase() === selectedCategory.toLowerCase()) ||
-                    (restaurant.settings?.branding?.font_style && restaurant.settings.branding.font_style.toLowerCase().includes(selectedCategory.toLowerCase()));
+                const settings = r.settings as any;
+                const categories = settings?.marketplaceSettings?.categories || [];
+                // Check if the restaurant has the selected category
+                return categories.includes(selectedCategory);
             });
         }
 
@@ -220,8 +273,36 @@ export default function MarketplaceHome() {
             result = [...result].sort((a, b) => (b.rating || 0) - (a.rating || 0));
         }
 
-        if (activeFilter === 'Price: Low to High') {
-            // Mock price sorting if needed, for now just a placeholder logic
+        // 4. Calculate Distance & Sort by Location (NEW DEFAULT)
+        if (userLocation) {
+            result = result.map(r => {
+                const settings = r.settings as any;
+                const coords = settings?.coordinates;
+                if (coords && coords.lat && coords.lng) {
+                    // Haversine Calc
+                    const R = 6371; // km
+                    const dLat = (coords.lat - userLocation.coords.latitude) * (Math.PI / 180);
+                    const dLon = (coords.lng - userLocation.coords.longitude) * (Math.PI / 180);
+                    const a =
+                        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                        Math.cos(userLocation.coords.latitude * (Math.PI / 180)) * Math.cos(coords.lat * (Math.PI / 180)) *
+                        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    const dist = R * c;
+
+                    return { ...r, _distNum: dist, distance: `${dist.toFixed(1)} km` };
+                }
+                return r;
+            });
+
+            // Default Sort by Distance if "Sort" is active or no specific sort
+            if (activeFilter === 'Sort') {
+                result.sort((a: any, b: any) => {
+                    if (a._distNum !== undefined && b._distNum !== undefined) return a._distNum - b._distNum;
+                    if (a._distNum !== undefined) return -1;
+                    return 1;
+                });
+            }
         }
 
         return result;
@@ -272,9 +353,11 @@ export default function MarketplaceHome() {
                     className="absolute left-0 right-0 z-50 items-center"
                     style={{ top: 60, zIndex: 0 }}
                 >
-                    <Text className="text-white tracking-tighter" style={{ fontSize: 42, fontWeight: '900', letterSpacing: -1 }}>
-                        Kitos<Text style={{ color: '#f89219' }}>.</Text>
-                    </Text>
+                    <Image
+                        source={require('../../../assets/logo-marketplace.png')}
+                        style={{ width: 336, height: 144 }}
+                        resizeMode="contain"
+                    />
                 </View>
 
                 {/* LAYER B: BOTTOM SHEET */}
@@ -304,27 +387,7 @@ export default function MarketplaceHome() {
                                 />
                             </View>
 
-                            <BottomSheetScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                className="mt-2 w-full"
-                                contentContainerStyle={{ paddingRight: 16 }}
-                            >
-                                {FILTERS.map((filter, index) => {
-                                    const isActive = activeFilter === filter;
-                                    return (
-                                        <TouchableOpacity
-                                            key={index}
-                                            onPress={() => setActiveFilter(filter)}
-                                            className={`rounded-full px-4 py-1.5 mr-2 ${isActive ? 'bg-orange-600' : 'bg-white border border-stone-200'}`}
-                                        >
-                                            <Text className={`text-xs font-medium ${isActive ? 'text-white' : 'text-stone-600'}`}>
-                                                {filter}
-                                            </Text>
-                                        </TouchableOpacity>
-                                    );
-                                })}
-                            </BottomSheetScrollView>
+
                         </View>
 
                         {/* SCROLLABLE MARKETPLACE CONTENT */}
@@ -379,43 +442,125 @@ export default function MarketplaceHome() {
                                     </View>
                                 ) : (
                                     <View className="gap-4">
-                                        {displayedRestaurants.map((restaurant) => (
-                                            <TouchableOpacity
-                                                key={restaurant.id}
-                                                onPress={() => router.push(`/takeout/${restaurant.id}`)}
-                                                className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden mb-2"
-                                            >
-                                                <Image
-                                                    source={{ uri: restaurant.settings?.branding?.cover_image_url || 'https://via.placeholder.com/400x300' }}
-                                                    className="w-full h-40 bg-stone-200"
-                                                    resizeMode="cover"
-                                                />
-                                                <View className="p-4">
-                                                    <View className="flex-row justify-between items-start mb-1">
-                                                        <Text className="text-xl font-bold text-stone-900 flex-1 mr-2">
-                                                            {restaurant.name}
+                                        {displayedRestaurants.map((restaurant) => {
+                                            const settings = restaurant.settings as any;
+                                            const marketplaceSettings = settings?.marketplaceSettings || {};
+                                            const coverImage = marketplaceSettings.coverImage || settings?.branding?.cover_image_url || 'https://via.placeholder.com/400x300';
+                                            const prepTime = marketplaceSettings.prepTime || '20-30 min';
+
+                                            // --- OPENING HOURS LOGIC ---
+                                            const getRestaurantStatus = () => {
+                                                const now = new Date();
+                                                const days = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+                                                const currentDayKey = days[now.getDay()];
+                                                const currentTime = now.getHours() * 60 + now.getMinutes();
+
+                                                const hours = settings?.opening_hours?.[currentDayKey];
+
+                                                if (!hours || hours.closed) {
+                                                    // Find next open day
+                                                    for (let i = 1; i <= 7; i++) {
+                                                        const nextDayIndex = (now.getDay() + i) % 7;
+                                                        const nextDayKey = days[nextDayIndex];
+                                                        const nextHours = settings?.opening_hours?.[nextDayKey];
+                                                        if (nextHours && !nextHours.closed) {
+                                                            const dayName = i === 1 ? 'Tomorrow' : nextDayKey.charAt(0).toUpperCase() + nextDayKey.slice(1);
+                                                            return { isOpen: false, status: 'CLOSED', message: `Opens ${dayName} ${nextHours.open}` };
+                                                        }
+                                                    }
+                                                    return { isOpen: false, status: 'CLOSED', message: 'Temporarily Closed' };
+                                                }
+
+                                                const [openH, openM] = hours.open.split(':').map(Number);
+                                                const [closeH, closeM] = hours.close.split(':').map(Number);
+
+                                                const openTime = openH * 60 + openM;
+                                                const closeTime = closeH * 60 + closeM;
+
+                                                // Handle late night closing (e.g. 02:00) - Simplified for now assuming same day or check logic
+                                                // If closeTime < openTime, it means it closes next day. 
+                                                // For simplicity, let's assume standard hours or handle the wrap.
+                                                let adjustedCloseTime = closeTime;
+                                                if (closeTime < openTime) adjustedCloseTime += 24 * 60;
+
+                                                if (currentTime >= openTime && currentTime < adjustedCloseTime) {
+                                                    // Check if closing soon (< 60 mins)
+                                                    const minsRemaining = adjustedCloseTime - currentTime;
+                                                    if (minsRemaining <= 60 && minsRemaining > 0) {
+                                                        return { isOpen: true, status: 'CLOSING_SOON', message: `Closing in ${minsRemaining}m` };
+                                                    }
+                                                    return { isOpen: true, status: 'OPEN', message: 'Open' };
+                                                } else {
+                                                    // Before open or after close
+                                                    if (currentTime < openTime) {
+                                                        return { isOpen: false, status: 'CLOSED', message: `Opens ${hours.open}` };
+                                                    } else {
+                                                        // Closed for the day, find next
+                                                        const nextDayIndex = (now.getDay() + 1) % 7;
+                                                        const nextDayKey = days[nextDayIndex];
+                                                        const nextHours = settings?.opening_hours?.[nextDayKey];
+                                                        const dayName = 'Tomorrow'; // Approximate
+                                                        return { isOpen: false, status: 'CLOSED', message: nextHours && !nextHours.closed ? `Opens ${dayName} ${nextHours.open}` : 'Closed' };
+                                                    }
+                                                }
+                                            };
+
+                                            const status = getRestaurantStatus();
+
+                                            return (
+                                                <TouchableOpacity
+                                                    key={restaurant.id}
+                                                    onPress={() => router.push(`/takeout/${restaurant.id}`)}
+                                                    className="bg-white rounded-2xl shadow-sm border border-stone-100 overflow-hidden mb-2"
+                                                    disabled={!status.isOpen}
+                                                >
+                                                    <View>
+                                                        <Image
+                                                            source={{ uri: coverImage }}
+                                                            className={`w-full h-40 bg-stone-200 ${!status.isOpen ? 'opacity-50' : ''}`}
+                                                            resizeMode="cover"
+                                                        />
+                                                        {/* Status Overlay */}
+                                                        {!status.isOpen && (
+                                                            <View className="absolute inset-0 items-center justify-center bg-black/40">
+                                                                <View className="bg-black/60 px-4 py-2 rounded-lg backdrop-blur-sm">
+                                                                    <Text className="text-white font-bold text-center">CURRENTLY CLOSED</Text>
+                                                                    <Text className="text-white/80 text-xs text-center mt-1">{status.message}</Text>
+                                                                </View>
+                                                            </View>
+                                                        )}
+                                                        {/* Closing Soon Badge */}
+                                                        {status.isOpen && status.status === 'CLOSING_SOON' && (
+                                                            <View className="absolute bottom-2 right-2 bg-red-500 px-3 py-1 rounded-full shadow-sm">
+                                                                <Text className="text-white text-xs font-bold">{status.message}</Text>
+                                                            </View>
+                                                        )}
+                                                    </View>
+
+                                                    <View className="p-4">
+                                                        <View className="flex-row justify-between items-start mb-1">
+                                                            <Text className={`text-xl font-bold flex-1 mr-2 ${!status.isOpen ? 'text-stone-400' : 'text-stone-900'}`}>
+                                                                {restaurant.name}
+                                                            </Text>
+                                                            <View className="flex-row items-center bg-stone-100 px-2 py-1 rounded-lg">
+                                                                <Star size={14} color="#f59e0b" fill="#f59e0b" />
+                                                                <Text className="font-bold ml-1 text-stone-800">{(restaurant.rating || 4.5).toFixed(1)}</Text>
+                                                            </View>
+                                                        </View>
+                                                        <Text className="text-stone-500 text-sm mb-3">
+                                                            {restaurant.settings?.branding?.font_style || 'Restaurant'} • {restaurant.distance || '1.2 km'}
                                                         </Text>
-                                                        <View className="flex-row items-center bg-stone-100 px-2 py-1 rounded-lg">
-                                                            <Star size={14} color="#f59e0b" fill="#f59e0b" />
-                                                            <Text className="font-bold ml-1 text-stone-800">{restaurant.rating || 4.5}</Text>
+                                                        <View className="flex-row gap-4 border-t border-stone-100 pt-3">
+                                                            <View className="flex-row items-center">
+                                                                <Clock size={14} color="#78716c" />
+                                                                <Text className="text-stone-500 text-sm ml-1">{prepTime}</Text>
+                                                            </View>
+                                                            {/* Removed Service Type display as requested */}
                                                         </View>
                                                     </View>
-                                                    <Text className="text-stone-500 text-sm mb-3">
-                                                        {restaurant.settings?.branding?.font_style || 'Restaurant'} • {restaurant.distance || '1.2 km'}
-                                                    </Text>
-                                                    <View className="flex-row gap-4 border-t border-stone-100 pt-3">
-                                                        <View className="flex-row items-center">
-                                                            <Clock size={14} color="#78716c" />
-                                                            <Text className="text-stone-500 text-sm ml-1">20-30 min</Text>
-                                                        </View>
-                                                        <View className="flex-row items-center">
-                                                            <CameraIcon size={14} color="#78716c" />
-                                                            <Text className="text-stone-500 text-sm ml-1">Table Service</Text>
-                                                        </View>
-                                                    </View>
-                                                </View>
-                                            </TouchableOpacity>
-                                        ))}
+                                                </TouchableOpacity>
+                                            )
+                                        })}
                                     </View>
                                 )}
                             </View>

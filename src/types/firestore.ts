@@ -89,6 +89,12 @@ export interface RestaurantSettings {
     };
     serviceType?: 'counter' | 'table';
     require_guest_name?: boolean;
+    isVisibleInMarketplace?: boolean;
+    marketplaceSettings?: {
+        coverImage?: string;
+        prepTime?: string;
+        categories?: string[];
+    };
 }
 
 // ============================================
