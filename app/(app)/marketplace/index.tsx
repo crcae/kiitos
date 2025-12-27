@@ -191,7 +191,7 @@ export default function MarketplaceHome() {
             const { hostname, pathname, searchParams } = urlObj;
 
             // Domain Validation
-            const validDomains = ['localhost', 'kiitos-app.web.app', 'kiitos-app.firebaseapp.com', '192.168.', '10.0.', '172.']; // Add internal IPs for dev
+            const validDomains = ['kitos.app', 'localhost', 'kiitos-app.web.app', 'kiitos-app.firebaseapp.com', '192.168.', '10.0.', '172.']; // Add internal IPs for dev
             const isValidDomain = validDomains.some(d => hostname.includes(d));
 
             if (!isValidDomain) {
