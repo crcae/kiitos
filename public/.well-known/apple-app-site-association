@@ -1,0 +1,11 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appID": "27469Q35CU.com.kitos.app",
+        "paths": ["/menu/*", "/pay/*", "/admin/*"]
+      }
+    ]
+  }
+}

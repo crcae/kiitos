@@ -1,0 +1,14 @@
+[
+    {
+        "relation": [
+            "delegate_permission/common.handle_all_urls"
+        ],
+        "target": {
+            "namespace": "android_app",
+            "package_name": "com.kitos.app",
+            "sha256_cert_fingerprints": [
+                "D2:C2:34:D8:C2:61:CF:61:F7:9F:0F:B9:CB:C5:C0:88:81:D8:7D:5B:32:25:28:1F:44:C8:A1:1C:0B:C7:AE:A5"
+            ]
+        }
+    }
+]
