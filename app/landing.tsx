@@ -333,7 +333,7 @@ export default function LandingPage() {
                             <View className="absolute inset-0 bg-kiitos-orange rounded-3xl rotate-6 opacity-20 blur-xl group-hover:rotate-12 group-hover:opacity-30 transition-all duration-500" />
                             <View className={`w-full ${isDesktop ? 'aspect-[4/3]' : 'aspect-square'} bg-gray-100 rounded-3xl overflow-hidden shadow-2xl border-4 border-white group-hover:shadow-3xl group-hover:scale-[1.02] transition-all duration-500`}>
                                 <Image
-                                    source={require('../assets/happy-waiter-serving-food-group-cheerful-friends-pub.jpg')}
+                                    source={{ uri: 'https://kitos.app/assets/assets/happy-waiter-serving-food-group-cheerful-friends-pub.99c915410731460c42ac228a7a53f762.jpg' }}
                                     className="w-full h-full"
                                     resizeMode={isDesktop ? "cover" : "contain"}
                                 />
