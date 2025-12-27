@@ -333,7 +333,7 @@ export default function LandingPage() {
                             <View className="absolute inset-0 bg-kiitos-orange rounded-3xl rotate-6 opacity-20 blur-xl group-hover:rotate-12 group-hover:opacity-30 transition-all duration-500" />
                             <View className={`w-full ${isDesktop ? 'aspect-[4/3]' : 'aspect-square'} bg-gray-100 rounded-3xl overflow-hidden shadow-2xl border-4 border-white group-hover:shadow-3xl group-hover:scale-[1.02] transition-all duration-500`}>
                                 <Image
-                                    source={{ uri: 'https://a1d29937b6ef0a112cc1d211b3fbc994.cdn.bubble.io/f1765991225702x496902933994371800/camarero-feliz-sirviendo-comida-un-grupo-de-amigos-alegres-en-un-pub.jpg?_gl=1*u3bqr2*_gcl_au*NjgwMDE3NzkyLjE3NTg1NjA5MTk.*_ga*MTI5MTI4ODI3Ny4xNzEyODU1NDE4*_ga_BFPVR2DEE2*czE3NjU5ODk5NjYkbzQzMyRnMSR0MTc2NTk5MTIxMyRqNTQkbDAkaDA.' }}
+                                    source={require('../assets/happy-waiter-serving-food-group-cheerful-friends-pub.jpg')}
                                     className="w-full h-full"
                                     resizeMode={isDesktop ? "cover" : "contain"}
                                 />
