@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, ScrollView, ActivityIndicator, StatusBar, Platform, Modal, TextInput } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image, ScrollView, ActivityIndicator, StatusBar, Platform, Modal, TextInput, Pressable } from 'react-native';
+import { NavigationContainer, NavigationIndependentTree } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ShoppingBag, ChevronLeft, Plus, Minus, FileText, Utensils, CheckCircle, Clock } from 'lucide-react-native';
+import { ShoppingBag, ChevronLeft, Plus, Minus, FileText, Utensils, CheckCircle, Clock, Smartphone, UserCircle } from 'lucide-react-native';
 import { colors } from '../styles/theme';
 import { subscribeToGuestCategories, subscribeToGuestProducts, getTableDetails, sendOrderToKitchen, subscribeToActiveSession } from '../services/guestMenu';
 import { subscribeToRestaurantConfig } from '../services/menu';
 import { subscribeToSession, joinSession } from '../services/sessions';
 import { Category, Product, Table, OrderItem, RestaurantSettings, SelectedModifier, ModifierGroup, ModifierOption, Session, SessionStaff } from '../types/firestore';
 import { useAuth } from '../context/AuthContext';
+import CustomerPhoneAuth from './auth/CustomerPhoneAuth';
 
 interface CartItem {
     cartId: string;
@@ -49,6 +51,11 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
     const [activeTab, setActiveTab] = useState<'menu' | 'bill'>('menu');
     const [successModalVisible, setSuccessModalVisible] = useState(false);
 
+    // Detail Modal State
+    const [detailModalVisible, setDetailModalVisible] = useState(false);
+    const [selectedProductForDetail, setSelectedProductForDetail] = useState<Product | null>(null);
+    const [detailQuantity, setDetailQuantity] = useState(1);
+
     // Modifier Selection State
     const [modifierModalVisible, setModifierModalVisible] = useState(false);
     const [selectedProductForModifiers, setSelectedProductForModifiers] = useState<Product | null>(null);
@@ -57,6 +64,7 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
     // Order Preview State
     const [previewModalVisible, setPreviewModalVisible] = useState(false);
     const [clientName, setClientName] = useState('');
+    const [authMode, setAuthMode] = useState<'phone' | 'guest'>('phone');
 
     // Shared Session State
     const [sessionItems, setSessionItems] = useState<OrderItem[]>(directSessionData || []);
@@ -64,6 +72,10 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(initialSessionId || null);
     const [activeSession, setActiveSession] = useState<Session | null>(null);
     const { user } = useAuth();
+
+    // Auth flow state
+    const [isAuthenticating, setIsAuthenticating] = useState(false);
+    const [shouldAutoSubmit, setShouldAutoSubmit] = useState(false);
 
     const unsubsRef = useRef<(() => void)[]>([]);
 
@@ -173,24 +185,48 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
         return currentTime >= openTime && currentTime <= closeTime;
     }, [openingHours]);
 
+    // Auto-submit order when user authenticates via phone auth in modal
+    useEffect(() => {
+        if (shouldAutoSubmit && user && previewModalVisible) {
+            console.log('🔐 User authenticated, auto-submitting order...');
+            setShouldAutoSubmit(false);
+            setPreviewModalVisible(false);
+            // Small delay to ensure state is fully updated
+            setTimeout(() => {
+                handleConfirmOrder();
+            }, 100);
+        }
+    }, [user, shouldAutoSubmit, previewModalVisible]);
+
     // Cart Logic
-    const addToCart = (product: Product) => {
-        console.log('🛒 addToCart called for:', product.name);
-        console.log('🛒 Modifiers:', JSON.stringify(product.modifiers));
+    const openProductDetails = (product: Product) => {
+        setSelectedProductForDetail(product);
+        setDetailQuantity(1);
+        setDetailModalVisible(true);
+    };
+
+    const addToCart = (product: Product, quantity: number = 1) => {
+        console.log('🛒 addToCart called for:', product.name, 'Qty:', quantity);
 
         // Check if product has modifiers
         if (product.modifiers && product.modifiers.length > 0) {
             console.log('✨ Opening modifier modal');
+            // Close detail modal if open
+            setDetailModalVisible(false);
+
             setSelectedProductForModifiers(product);
             setTempSelectedModifiers([]);
             setModifierModalVisible(true);
         } else {
             console.log('➕ Adding directly to cart (no modifiers)');
-            addItemToCart(product, []);
+            // Close detail modal if open
+            setDetailModalVisible(false);
+
+            addItemToCart(product, [], quantity);
         }
     };
 
-    const addItemToCart = (product: Product, modifiers: SelectedModifier[]) => {
+    const addItemToCart = (product: Product, modifiers: SelectedModifier[], quantity: number = 1) => {
         console.log('here')
         setCart(prev => {
             // Check if identical item exists (same product + same modifiers)
@@ -201,14 +237,14 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
 
             if (existingIndex >= 0) {
                 const newCart = [...prev];
-                newCart[existingIndex].quantity += 1;
+                newCart[existingIndex].quantity += quantity;
                 return newCart;
             }
 
             return [...prev, {
                 cartId: `${product.id}-${Date.now()}-${Math.random()}`,
                 product,
-                quantity: 1,
+                quantity: quantity,
                 modifiers
             }];
         });
@@ -276,7 +312,7 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
             return;
         }
 
-        addItemToCart(selectedProductForModifiers, tempSelectedModifiers);
+        addItemToCart(selectedProductForModifiers, tempSelectedModifiers, 1);
         setModifierModalVisible(false);
         setSelectedProductForModifiers(null);
         setTempSelectedModifiers([]);
@@ -310,7 +346,9 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                 modifiers: item.modifiers
             }));
 
-            await sendOrderToKitchen(restaurantId, tableId, itemsForService as any, createdById, clientName || undefined);
+            // Use logged-in user's name or manually entered name
+            const finalName = user?.name || clientName;
+            await sendOrderToKitchen(restaurantId, tableId, itemsForService as any, createdById, finalName || undefined);
             setCart([]);
             setClientName(''); // Reset client name
             setSuccessModalVisible(true);
@@ -402,52 +440,57 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
             <StatusBar barStyle="dark-content" />
 
             {/* Header */}
-            <View className="px-5 py-4 flex-row justify-between items-center bg-white border-b border-gray-100">
-                <View>
-                    {mode === 'waiter' && (
-                        <View className="flex-row items-center gap-2 mb-1">
-                            <View className="bg-orange-100 px-2 py-0.5 rounded self-start border border-orange-200">
-                                <Text className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">PORTAL MESERO</Text>
-                            </View>
-                        </View>
-                    )}
-
-                    {branding?.logo_url ? (
+            <View className="bg-white border-b border-gray-100 pb-3">
+                {branding?.logo_url ? (
+                    <View className="items-center py-2">
                         <Image
                             source={{ uri: branding.logo_url }}
-                            className="h-10 w-32"
+                            className="h-24 w-60"
                             resizeMode="contain"
                         />
-                    ) : (
-                        <>
-                            <Text className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-                                {mode === 'takeout' ? 'PEDIDO PARA LLEVAR' : 'MENU'}
-                            </Text>
-                            <Text className="text-2xl font-extrabold text-gray-900">
-                                {mode === 'takeout' ? 'Llevar' : (table?.name || 'Table')}
-                            </Text>
-                        </>
-                    )}
-                </View>
-                {/* Tabs - Only show if not takeout (takeout doesn't have active bill usually) */}
-                {mode !== 'takeout' && (
-                    <View className="flex-row bg-gray-100 p-1 rounded-xl">
-                        <TouchableOpacity
-                            onPress={() => setActiveTab('menu')}
-                            className={`px-4 py-2 rounded-lg ${activeTab === 'menu' ? 'bg-white shadow-sm' : ''}`}
-                            style={activeTab === 'menu' && branding?.primary_color ? { borderBottomWidth: 2, borderBottomColor: branding.primary_color } : {}}
-                        >
-                            <Utensils size={18} color={activeTab === 'menu' && branding?.primary_color ? branding.primary_color : (activeTab === 'menu' ? 'black' : 'gray')} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            onPress={() => setActiveTab('bill')}
-                            className={`px-4 py-2 rounded-lg ${activeTab === 'bill' ? 'bg-white shadow-sm' : ''}`}
-                            style={activeTab === 'bill' && branding?.primary_color ? { borderBottomWidth: 2, borderBottomColor: branding.primary_color } : {}}
-                        >
-                            <FileText size={18} color={activeTab === 'bill' && branding?.primary_color ? branding.primary_color : (activeTab === 'bill' ? 'black' : 'gray')} />
-                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <View className="px-5 py-4">
+                        <Text className="text-sm font-bold text-gray-400 uppercase tracking-widest">
+                            {mode === 'takeout' ? 'PEDIDO PARA LLEVAR' : 'MENU'}
+                        </Text>
+                        <Text className="text-2xl font-extrabold text-gray-900">
+                            {mode === 'takeout' ? 'Llevar' : (table?.name || 'Table')}
+                        </Text>
                     </View>
                 )}
+
+                <View className="px-5 flex-row justify-between items-center">
+                    <View>
+                        {mode === 'waiter' && (
+                            <View className="flex-row items-center gap-2 mb-1">
+                                <View className="bg-orange-100 px-2 py-0.5 rounded self-start border border-orange-200">
+                                    <Text className="text-[10px] font-bold text-orange-600 uppercase tracking-widest">PORTAL MESERO</Text>
+                                </View>
+                            </View>
+                        )}
+                    </View>
+
+                    {/* Tabs - Only show if not takeout (takeout doesn't have active bill usually) */}
+                    {mode !== 'takeout' && (
+                        <View className="flex-row bg-gray-100 p-1 rounded-xl self-end ml-auto">
+                            <TouchableOpacity
+                                onPress={() => setActiveTab('menu')}
+                                className={`px-4 py-2 rounded-lg ${activeTab === 'menu' ? 'bg-white shadow-sm' : ''}`}
+                                style={activeTab === 'menu' && branding?.primary_color ? { borderBottomWidth: 2, borderBottomColor: branding.primary_color } : {}}
+                            >
+                                <Utensils size={18} color={activeTab === 'menu' && branding?.primary_color ? branding.primary_color : (activeTab === 'menu' ? 'black' : 'gray')} />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                onPress={() => setActiveTab('bill')}
+                                className={`px-4 py-2 rounded-lg ${activeTab === 'bill' ? 'bg-white shadow-sm' : ''}`}
+                                style={activeTab === 'bill' && branding?.primary_color ? { borderBottomWidth: 2, borderBottomColor: branding.primary_color } : {}}
+                            >
+                                <FileText size={18} color={activeTab === 'bill' && branding?.primary_color ? branding.primary_color : (activeTab === 'bill' ? 'black' : 'gray')} />
+                            </TouchableOpacity>
+                        </View>
+                    )}
+                </View>
             </View>
 
             {/* Closed Banner */}
@@ -492,7 +535,11 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                             </View>
                         }
                         renderItem={({ item }) => (
-                            <View className="flex-row mb-6 bg-white">
+                            <TouchableOpacity
+                                className="flex-row mb-6 bg-white"
+                                onPress={() => openProductDetails(item)}
+                                activeOpacity={0.7}
+                            >
                                 {/* Image */}
                                 {item.image_url ? (
                                     <Image source={{ uri: item.image_url }} className="w-28 h-28 rounded-xl bg-gray-100 mr-4" resizeMode="cover" />
@@ -512,42 +559,32 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                                     <View className="flex-row justify-between items-center mt-3">
                                         <Text className="text-base font-semibold text-gray-900" style={branding?.primary_color ? { color: branding.primary_color } : {}}>${item.price.toFixed(2)}</Text>
 
-                                        {/* Ordering Controls - Check allow_guest_ordering unless mode is waiter or takeout (takeout always orders) */}
+                                        {/* Ordering Controls */}
                                         {isRestaurantOpen && (allowOrdering || mode === 'waiter' || mode === 'takeout') && (
                                             getQuantity(item.id) === 0 ? (
                                                 <TouchableOpacity
-                                                    onPress={() => addToCart(item)}
+                                                    onPress={() => addToCart(item, 1)}
                                                     className="w-10 h-10 bg-gray-100 rounded-full items-center justify-center active:bg-gray-200"
                                                 >
                                                     <Plus size={20} color="black" />
                                                 </TouchableOpacity>
                                             ) : (
                                                 <View className="flex-row items-center bg-black rounded-full px-1" style={branding?.primary_color ? { backgroundColor: branding.primary_color } : {}}>
-                                                    {/* If item has modifiers, we can't easily remove "one" without knowing which one. 
-                                                        So for now, if it has modifiers, maybe just show the count and a plus button to add another config?
-                                                        Or we just show the Plus button always if it has modifiers?
-                                                        
-                                                        Let's simplify: If it has modifiers, always show Plus button style (maybe with a count badge if > 0).
-                                                        Removing specific modifier combos is done in the Cart view (which we don't have fully detailed here, just the summary).
-                                                        
-                                                        For this view, let's just allow ADDING.
-                                                    */}
                                                     {item.modifiers && item.modifiers.length > 0 ? (
-                                                        <TouchableOpacity onPress={() => addToCart(item)} className="flex-row items-center px-3 py-2">
+                                                        <TouchableOpacity onPress={() => addToCart(item, 1)} className="flex-row items-center px-3 py-2">
                                                             <Text className="text-white font-bold mr-1">{getQuantity(item.id)}</Text>
                                                             <Plus size={16} color="white" />
                                                         </TouchableOpacity>
                                                     ) : (
                                                         <>
                                                             <TouchableOpacity onPress={() => {
-                                                                // Find the cart item for this product (simple case)
                                                                 const cartItem = cart.find(c => c.product.id === item.id);
                                                                 if (cartItem) removeFromCart(cartItem.cartId);
                                                             }} className="w-8 h-8 items-center justify-center">
                                                                 <Minus size={16} color="white" />
                                                             </TouchableOpacity>
                                                             <Text className="text-white font-bold w-4 text-center">{getQuantity(item.id)}</Text>
-                                                            <TouchableOpacity onPress={() => addToCart(item)} className="w-8 h-8 items-center justify-center">
+                                                            <TouchableOpacity onPress={() => addToCart(item, 1)} className="w-8 h-8 items-center justify-center">
                                                                 <Plus size={16} color="white" />
                                                             </TouchableOpacity>
                                                         </>
@@ -557,7 +594,7 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
                                         )}
                                     </View>
                                 </View>
-                            </View>
+                            </TouchableOpacity>
                         )}
                     />
 
@@ -762,85 +799,213 @@ export default function DigitalMenuInterface({ restaurantId, tableId, mode = 'gu
             {/* Order Preview Modal */}
             <Modal visible={previewModalVisible} transparent animationType="slide">
                 <View className="flex-1 justify-end bg-black/50">
-                    <View className="bg-white rounded-t-3xl h-[75%] overflow-hidden">
+                    <View className="bg-white rounded-t-3xl h-[85%] overflow-hidden">
                         <View className="p-6 border-b border-gray-100">
                             <Text className="text-2xl font-bold text-gray-900">Confirmar Pedido</Text>
-                            <Text className="text-gray-500 mt-1">Revisa tu orden antes de enviarla</Text>
                         </View>
-
-                        <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 100 }}>
-                            {/* Cart Items */}
-                            {cart.map((item, idx) => {
-                                const itemTotal = (item.product.price + item.modifiers.reduce((sum, m) => sum + m.price, 0)) * item.quantity;
-                                return (
-                                    <View key={item.cartId} className="mb-4 pb-4 border-b border-gray-100">
-                                        <View className="flex-row justify-between items-start">
-                                            <View className="flex-1">
-                                                <Text className="text-lg font-semibold text-gray-900">
-                                                    {item.quantity}x {item.product.name}
+                        <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+                            {/* Order Summary */}
+                            <View className="px-5 pt-4 pb-2">
+                                {cart.map((item, idx) => {
+                                    const itemTotal = (item.product.price + item.modifiers.reduce((sum, m) => sum + m.price, 0)) * item.quantity;
+                                    return (
+                                        <View key={item.cartId} className="mb-3 pb-3 border-b border-gray-100">
+                                            <View className="flex-row justify-between items-start">
+                                                <View className="flex-1">
+                                                    <Text className="text-base font-semibold text-gray-900">
+                                                        {item.quantity}x {item.product.name}
+                                                    </Text>
+                                                    {item.modifiers.length > 0 && (
+                                                        <View className="mt-1">
+                                                            {item.modifiers.map((mod, mIdx) => (
+                                                                <Text key={mIdx} className="text-xs text-gray-600">
+                                                                    + {mod.name} {mod.price > 0 ? `($${mod.price.toFixed(2)})` : ''}
+                                                                </Text>
+                                                            ))}
+                                                        </View>
+                                                    )}
+                                                </View>
+                                                <Text className="text-base font-bold text-gray-900 ml-4">
+                                                    ${itemTotal.toFixed(2)}
                                                 </Text>
-                                                {item.modifiers.length > 0 && (
-                                                    <View className="mt-2">
-                                                        {item.modifiers.map((mod, mIdx) => (
-                                                            <Text key={mIdx} className="text-sm text-gray-600">
-                                                                + {mod.name} {mod.price > 0 ? `($${mod.price.toFixed(2)})` : ''}
-                                                            </Text>
-                                                        ))}
-                                                    </View>
-                                                )}
                                             </View>
-                                            <Text className="text-lg font-bold text-gray-900 ml-4">
-                                                ${itemTotal.toFixed(2)}
-                                            </Text>
                                         </View>
-                                    </View>
-                                );
-                            })}
-
-                            {/* Client Name Input */}
-                            <View className="mt-6">
-                                <Text className="text-base font-semibold text-gray-900 mb-2">Tu Nombre (Opcional)</Text>
-                                <TextInput
-                                    value={clientName}
-                                    onChangeText={setClientName}
-                                    placeholder="Ej: Juan Pérez"
-                                    className="border border-gray-200 rounded-xl px-4 py-3 text-base text-gray-900"
-                                    placeholderTextColor="#999"
-                                />
-                                <Text className="text-xs text-gray-500 mt-1">
-                                    Para identificar tu pedido en la cuenta
-                                </Text>
+                                    );
+                                })}
                             </View>
 
                             {/* Total */}
-                            <View className="mt-6 pt-4 border-t-2 border-gray-200">
+                            <View className="px-5 py-3 bg-gray-50">
                                 <View className="flex-row justify-between items-center">
-                                    <Text className="text-xl font-bold text-gray-900">Total</Text>
-                                    <Text className="text-2xl font-extrabold text-gray-900">${cartTotal.toFixed(2)}</Text>
+                                    <Text className="text-lg font-bold text-gray-900">Total</Text>
+                                    <Text className="text-xl font-extrabold text-gray-900">${cartTotal.toFixed(2)}</Text>
                                 </View>
+                            </View>
+
+                            {/* Identity Section */}
+                            <View className="border-t border-gray-100 pt-4 px-5">
+                                {user ? (
+                                    // Logged-in user: Show name
+                                    <View className="bg-green-50 p-4 rounded-xl border border-green-200">
+                                        <View className="flex-row items-center mb-2">
+                                            <CheckCircle size={20} color="#10b981" />
+                                            <Text className="ml-2 font-bold text-green-800">Sesión Activa</Text>
+                                        </View>
+                                        <Text className="text-green-700">Pedido a nombre de: <Text className="font-bold">{user.name}</Text></Text>
+                                    </View>
+                                ) : (
+                                    // Anonymous user: Show auth options
+                                    <>
+                                        <Text className="text-lg font-bold text-gray-900 mb-4">¿Cómo deseas continuar?</Text>
+
+                                        {/* Tab Selector - Wrapped in NavigationIndependentTree + NavigationContainer to isolate context on iOS Modals (RN7 logic) */}
+                                        <NavigationIndependentTree>
+                                            <NavigationContainer>
+                                                <View className="flex-row bg-gray-100 p-1 rounded-xl mb-4">
+                                                    <Pressable
+                                                        onPress={() => setAuthMode('phone')}
+                                                        style={({ pressed }) => [
+                                                            { opacity: pressed ? 0.7 : 1 },
+                                                            authMode === 'phone' ? { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 } : {}
+                                                        ]}
+                                                        className={`flex-1 px-4 py-3 rounded-lg`}
+                                                    >
+                                                        <View className="flex-row items-center justify-center">
+                                                            <Smartphone size={18} color={authMode === 'phone' ? colors.roastedSaffron : '#6B7280'} />
+                                                            <Text className={`ml-2 font-semibold ${authMode === 'phone' ? 'text-gray-900' : 'text-gray-600'}`}>Celular</Text>
+                                                        </View>
+                                                    </Pressable>
+                                                    <Pressable
+                                                        onPress={() => setAuthMode('guest')}
+                                                        style={({ pressed }) => [
+                                                            { opacity: pressed ? 0.7 : 1 },
+                                                            authMode === 'guest' ? { backgroundColor: 'white', shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 2 } : {}
+                                                        ]}
+                                                        className={`flex-1 px-4 py-3 rounded-lg`}
+                                                    >
+                                                        <View className="flex-row items-center justify-center">
+                                                            <UserCircle size={18} color={authMode === 'guest' ? colors.roastedSaffron : '#6B7280'} />
+                                                            <Text className={`ml-2 font-semibold ${authMode === 'guest' ? 'text-gray-900' : 'text-gray-600'}`}>Invitado</Text>
+                                                        </View>
+                                                    </Pressable>
+                                                </View>
+                                            </NavigationContainer>
+                                        </NavigationIndependentTree>
+
+                                        {/* Content based on selected mode */}
+                                        {authMode === 'phone' ? (
+                                            <View>
+                                                <Text className="text-xs text-gray-600 mb-3">
+                                                    ✨ <Text className="font-semibold">Recomendado:</Text> Guarda tus datos para futuros pedidos y accede a tu historial.
+                                                </Text>
+                                                <CustomerPhoneAuth
+                                                    key={authMode}
+                                                    active={authMode === 'phone'}
+                                                    compact
+                                                    onSuccess={() => {
+                                                        // User authenticated, flag for auto-submit
+                                                        setIsAuthenticating(false);
+                                                        setShouldAutoSubmit(true);
+                                                    }}
+                                                />
+                                            </View>
+                                        ) : (
+                                            <View>
+                                                <Text className="text-sm text-gray-600 mb-3">Continúa sin crear una cuenta. Solo necesitamos tu nombre.</Text>
+                                                <TextInput
+                                                    value={clientName}
+                                                    onChangeText={setClientName}
+                                                    placeholder="Tu nombre"
+                                                    className="border border-gray-200 rounded-xl px-4 py-3 bg-gray-50 text-base"
+                                                    autoCapitalize="words"
+                                                    placeholderTextColor="#999"
+                                                />
+                                                <Text className="text-xs text-gray-500 mt-1">
+                                                    Para identificar tu pedido en la cuenta
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </>
+                                )}
                             </View>
                         </ScrollView>
 
-                        <View className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100" style={{ paddingBottom: insets.bottom + 10 }}>
-                            <TouchableOpacity
-                                onPress={handleConfirmOrder}
-                                className="bg-black py-4 rounded-xl items-center shadow-lg mb-2"
-                                style={branding?.primary_color ? { backgroundColor: branding.primary_color } : {}}
-                            >
-                                <Text className="text-white font-bold text-lg">
-                                    Confirmar y Enviar a Cocina
-                                </Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                onPress={() => setPreviewModalVisible(false)}
-                                className="bg-gray-100 py-4 rounded-xl items-center"
-                            >
-                                <Text className="text-gray-700 font-semibold text-base">Cancelar</Text>
-                            </TouchableOpacity>
-                        </View>
+                        {/* Footer Actions - Only show if user exists OR guest mode */}
+                        {(user || authMode === 'guest') && (
+                            <View className="absolute bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-100" style={{ paddingBottom: insets.bottom + 10 }}>
+                                <TouchableOpacity
+                                    onPress={handleConfirmOrder}
+                                    className="bg-black py-4 rounded-xl items-center shadow-lg mb-2"
+                                    style={branding?.primary_color ? { backgroundColor: branding.primary_color } : {}}
+                                    disabled={!user && authMode === 'guest' && !clientName}
+                                >
+                                    <Text className="text-white font-bold text-lg">
+                                        Confirmar y Enviar a Cocina
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    onPress={() => setPreviewModalVisible(false)}
+                                    className="bg-gray-100 py-4 rounded-xl items-center"
+                                >
+                                    <Text className="text-gray-700 font-semibold text-base">Cancelar</Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
                     </View>
                 </View>
             </Modal>
-        </View>
+
+            {/* Product Detail Modal */}
+            <Modal visible={detailModalVisible} animationType="slide" presentationStyle="pageSheet">
+                <View className="flex-1 bg-white">
+                    <ScrollView>
+                        {selectedProductForDetail?.image_url && (
+                            <Image source={{ uri: selectedProductForDetail.image_url }} className="w-full h-80 bg-gray-100" resizeMode="cover" />
+                        )}
+                        <View className="p-6">
+                            <View className="flex-row justify-between items-start mb-2">
+                                <Text className="text-3xl font-bold text-gray-900 flex-1 mr-4">{selectedProductForDetail?.name}</Text>
+                                <Text className="text-2xl font-bold text-gray-900">${selectedProductForDetail?.price.toFixed(2)}</Text>
+                            </View>
+                            <Text className="text-lg text-gray-500 leading-relaxed mb-6">{selectedProductForDetail?.description}</Text>
+                        </View>
+                    </ScrollView>
+
+                    {/* Footer Actions */}
+                    <View className="p-4 border-t border-gray-100 bg-white shadow-lg" style={{ paddingBottom: insets.bottom + 20 }}>
+                        <View className="flex-row items-center gap-4">
+                            {/* Quantity Control */}
+                            <View className="flex-row items-center bg-gray-100 rounded-full h-14 px-2">
+                                <TouchableOpacity
+                                    onPress={() => setDetailQuantity(Math.max(1, detailQuantity - 1))}
+                                    className="w-10 h-10 bg-white rounded-full items-center justify-center shadow-sm"
+                                >
+                                    <Minus size={20} color="black" />
+                                </TouchableOpacity>
+                                <Text className="text-xl font-bold mx-4 w-6 text-center">{detailQuantity}</Text>
+                                <TouchableOpacity
+                                    onPress={() => setDetailQuantity(detailQuantity + 1)}
+                                    className="w-10 h-10 bg-white rounded-full items-center justify-center shadow-sm"
+                                >
+                                    <Plus size={20} color="black" />
+                                </TouchableOpacity>
+                            </View>
+
+                            {/* Add Button */}
+                            <TouchableOpacity
+                                onPress={() => selectedProductForDetail && addToCart(selectedProductForDetail, detailQuantity)}
+                                className="flex-1 h-14 bg-black rounded-full items-center justify-center"
+                                style={branding?.primary_color ? { backgroundColor: branding.primary_color } : {}}
+                            >
+                                <Text className="text-white text-lg font-bold">Add to Order</Text>
+                            </TouchableOpacity>
+                        </View>
+                        <TouchableOpacity onPress={() => setDetailModalVisible(false)} className="mt-4 items-center">
+                            <Text className="text-gray-500 font-bold">Close</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+        </View >
     );
 }
