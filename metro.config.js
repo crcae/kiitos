@@ -15,6 +15,16 @@ config.resolver.extraNodeModules = {
   'react-async-hook': require.resolve('react-async-hook'),
 };
 
+config.resolver.resolveRequest = (context, moduleName, platform) => {
+  if (moduleName === 'tslib') {
+    return {
+      filePath: require.resolve('./tslib-shim.js'),
+      type: 'sourceFile',
+    };
+  }
+  return context.resolveRequest(context, moduleName, platform);
+};
+
 // --- FIN DEL FIX ---
 
 module.exports = withNativeWind(config, { input: "./global.css" });

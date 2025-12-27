@@ -130,6 +130,16 @@ export default function ProfileScreen() {
                                 bg="#EFF6FF"
                             />
 
+                            <View style={styles.divider} />
+
+                            <MenuItem
+                                icon={<CreditCard size={20} color="#10B981" />}
+                                label="Kushki Test (Temporal)"
+                                sub="Verify payment integration"
+                                onPress={() => router.push('/kushki-test')}
+                                bg="#ECFDF5"
+                            />
+
                         </View>
                     </View>
 
