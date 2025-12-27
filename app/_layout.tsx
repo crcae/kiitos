@@ -105,7 +105,7 @@ function RootRouteGuard() {
                     router.replace('/admin');
                 }
                 // Only redirect from login pages, NOT from root (allow landing page)
-                if (path === 'login' || path === 'login/staff') {
+                if (path === 'login' || path === '(auth)/login' || path === 'login/staff' || path === '(auth)/login/staff') {
                     router.replace('/admin');
                 }
             } else {
@@ -122,8 +122,8 @@ function RootRouteGuard() {
                 }
 
                 // 2. Redirect from Login to specific dashboard (ONLY if on login page)
-                // Fix: account for (auth) group in path
-                if (path === 'login' || path === '(auth)/login' || path === 'login/staff') {
+                // Fix: account for all login variations including staff login
+                if (path === 'login' || path === '(auth)/login' || path === 'login/staff' || path === '(auth)/login/staff') {
                     if (user.role === 'saas_admin') router.replace('/admin');
                     else if (user.role === 'waiter') router.replace('/waiter');
                     else if (user.role === 'cashier') router.replace('/cashier');
