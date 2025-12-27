@@ -7,10 +7,11 @@
     },
     "nav": {
         "for_restaurants": "For Restaurants",
+        "for_diners": "For Diners",
         "go_to_dashboard": "Go to Dashboard ({{name}})",
         "dashboard": "Dashboard",
-        "login": "Log In",
-        "signup": "Get Started"
+        "login": "Login",
+        "signup": "Start for Free"
     },
     "hero": {
         "badge": "The Future of Dining Payment",
@@ -74,5 +75,47 @@
         "copyright": "© 2026 Kitos Inc. All rights reserved.",
         "privacy": "Privacy Policy",
         "terms": "Terms of Service"
+    },
+    "comparison": {
+        "title": "Traditional Payment vs. Kitos",
+        "subtitle": "Why Kitos?",
+        "description": "Discover how we transform the payment experience in restaurants",
+        "badge": "BEST",
+        "old_way_title": "Traditional",
+        "old_step1": "Wait for waiter",
+        "old_step2": "Terminal fails",
+        "old_step3": "Confusing math",
+        "old_step4": "Separate checks impossible",
+        "old_step5": "No expense tracking",
+        "old_time": "⏱️ Average time: 8-12 min",
+        "new_way_title": "Kitos Experience",
+        "new_step1": "Scan & Order",
+        "new_step2": "Split the bill",
+        "new_step3": "Pay in 10s",
+        "new_step4": "Everyone pays their share",
+        "new_step5": "Consumption history",
+        "new_time": "⚡ Average time: 10 seconds"
+    },
+    "expanded_features": {
+        "speed_title": "Faster Table Turnover",
+        "speed_desc": "Reduce unnecessary table occupancy time. Customers leave when they want, freeing up space for the next ones.",
+        "split_title": "Painless Bill Splitting",
+        "split_desc": "Forget calculators and endless receipts. Kitos allows each diner to pay for what they consumed or split equally.",
+        "data_title": "Control & Analytics",
+        "data_desc": "Make decisions based on real data. Know your best-selling dishes, peak hours, and staff performance."
+    },
+    "faq": {
+        "title": "Frequently Asked Questions",
+        "q1": "Do customers need to download an App?",
+        "a1": "No. Kitos works directly in the phone's web browser. Zero friction.",
+        "q2": "Does it work with my current system?",
+        "a2": "Kitos can work independently or integrate. Contact us for technical details.",
+        "q3": "How much does it cost?",
+        "a3": "We offer flexible plans adapted to your restaurant's size. Schedule a demo to learn more."
+    },
+    "final_cta": {
+        "title": "Ready to modernize your restaurant?",
+        "subtitle": "Join 500+ restaurants that are already earning more.",
+        "btn": "Get Started Now"
     }
 }

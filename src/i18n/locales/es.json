@@ -7,10 +7,11 @@
     },
     "nav": {
         "for_restaurants": "Para Restaurantes",
+        "for_diners": "Para Comensales",
         "go_to_dashboard": "Ir al Panel ({{name}})",
         "dashboard": "Panel de Control",
         "login": "Iniciar Sesión",
-        "signup": "Comenzar"
+        "signup": "Empezar Gratis"
     },
     "hero": {
         "badge": "El Futuro del Pago en Restaurantes",
@@ -74,5 +75,47 @@
         "copyright": "© 2026 Kitos Inc. Todos los derechos reservados.",
         "privacy": "Política de Privacidad",
         "terms": "Términos de Servicio"
+    },
+    "comparison": {
+        "title": "Pago Tradicional vs. Kitos",
+        "subtitle": "¿Por qué Kitos?",
+        "description": "Descubre cómo transformamos la experiencia de pago en restaurantes",
+        "badge": "MEJOR",
+        "old_way_title": "Tradicional",
+        "old_step1": "Esperar al mesero",
+        "old_step2": "La terminal falla",
+        "old_step3": "Cálculos confusos",
+        "old_step4": "Cuentas separadas imposibles",
+        "old_step5": "Sin control de gastos",
+        "old_time": "⏱️ Tiempo promedio: 8-12 min",
+        "new_way_title": "Experiencia Kitos",
+        "new_step1": "Escanea y pide",
+        "new_step2": "Divide la cuenta",
+        "new_step3": "Paga en 10s",
+        "new_step4": "Cada quien paga lo suyo",
+        "new_step5": "Historial de consumo",
+        "new_time": "⚡ Tiempo promedio: 10 segundos"
+    },
+    "expanded_features": {
+        "speed_title": "Rotación de Mesas Veloz",
+        "speed_desc": "Reduce el tiempo de mesa ocupada innecesariamente. Los clientes se van cuando quieren, liberando espacio para los siguientes.",
+        "split_title": "Cuentas Divididas sin Dolor",
+        "split_desc": "Olvídate de las calculadoras y los recibos interminables. Kitos permite que cada comensal pague lo que consumió o divida partes iguales.",
+        "data_title": "Control y Analítica",
+        "data_desc": "Toma decisiones basadas en datos reales. Conoce tus platillos más vendidos, horarios pico y rendimiento del staff."
+    },
+    "faq": {
+        "title": "Preguntas Frecuentes",
+        "q1": "¿Los clientes necesitan descargar una App?",
+        "a1": "No. Kitos funciona directamente en el navegador web del teléfono. Cero fricción.",
+        "q2": "¿Funciona con mi sistema actual?",
+        "a2": "Kitos puede trabajar de forma independiente o integrarse. Contáctanos para detalles técnicos.",
+        "q3": "¿Cuánto cuesta empezar?",
+        "a3": "Ofrecemos planes flexibles adaptados al tamaño de tu restaurante. Agenda una demo para saber más."
+    },
+    "final_cta": {
+        "title": "¿Listo para modernizar tu restaurante?",
+        "subtitle": "Únete a los 500+ restaurantes que ya están facturando más.",
+        "btn": "Empezar Ahora"
     }
 }
