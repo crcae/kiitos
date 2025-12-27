@@ -9,6 +9,7 @@ import { colors, spacing, typography } from '../styles/theme';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../services/firebaseConfig';
 import ReviewSystem from './ReviewSystem';
+import { KushkiPayment } from './payments/KushkiPayment';
 
 type SplitMode = 'full' | 'items' | 'equal' | 'custom';
 
@@ -237,10 +238,15 @@ export default function PaymentInterface({
             return;
         }
 
+        if (mode === 'guest') {
+            setShowPaymentForm(true);
+            return;
+        }
+
         await processPaymentWithAmount(amount, tip);
     };
 
-    const processPaymentWithAmount = async (amount: number, tip: number) => {
+    const processPaymentWithAmount = async (amount: number, tip: number, paymentMethodOverride?: 'kushki') => {
         if (splitMode === 'items' && selectedVirtualIds.size === 0) {
             Alert.alert('Error', 'Por favor selecciona al menos un item para pagar');
             return;
@@ -281,7 +287,7 @@ export default function PaymentInterface({
                     restaurantId,
                     session.id || 'local',
                     selectedItems,
-                    paymentMethod,
+                    paymentMethodOverride || paymentMethod,
                     mode,
                     tip
                 );
@@ -293,7 +299,7 @@ export default function PaymentInterface({
                         restaurantId,
                         session.id,
                         amount,
-                        paymentMethod, // Use selected method
+                        paymentMethodOverride || paymentMethod, // Use selected method or override
                         mode, // 'guest' or 'waiter'
                         tip
                     );
@@ -341,6 +347,8 @@ export default function PaymentInterface({
             setPaymentLoading(false);
         }
     };
+
+    const [showPaymentForm, setShowPaymentForm] = useState(false);
 
     if (loading) {
         return (
@@ -397,7 +405,7 @@ export default function PaymentInterface({
                                     <View style={styles.paymentItemLeft}>
                                         <Text style={styles.paymentMethod}>
                                             {payment.method === 'cash' ? '💵 Efectivo' :
-                                                payment.method === 'stripe' ? '💳 Tarjeta' : '💰 Otro'}
+                                                (payment.method === 'stripe' || payment.method === 'kushki') ? '💳 Tarjeta' : '💰 Otro'}
                                         </Text>
                                         {payment.createdBy && (
                                             <Text style={styles.paymentCreator}>({payment.createdBy})</Text>
@@ -418,7 +426,7 @@ export default function PaymentInterface({
                         <View style={[styles.receiptRow, styles.receiptTotalRow, { marginTop: 15 }]}>
                             <Text style={styles.receiptTotalLabel}>Total Pagado:</Text>
                             <Text style={styles.receiptTotalValue}>
-                                ${(session.amount_paid || 0).toFixed(2)}
+                                ${(payments.reduce((sum, p) => sum + p.amount + (p.tip || 0), 0)).toFixed(2)}
                             </Text>
                         </View>
                     </View>
@@ -820,6 +828,47 @@ export default function PaymentInterface({
                     )}
                 </TouchableOpacity>
             </View>
+
+            {/* KUSHKI PAYMENT MODAL / OVERLAY */}
+            {showPaymentForm && (
+                <View style={styles.paymentModalOverlay}>
+                    <View style={styles.paymentModalContent}>
+                        <TouchableOpacity
+                            style={styles.closeModalBtn}
+                            onPress={() => setShowPaymentForm(false)}
+                        >
+                            <Text style={styles.closeModalText}>✕</Text>
+                        </TouchableOpacity>
+
+                        <KushkiPayment
+                            amount={amountToPay + tipAmount}
+                            currency="MXN"
+                            hideSuccessView={true}
+                            onSuccess={async (tokenCallback) => {
+                                console.log('✅ [PaymentInterface] Kushki Success:', tokenCallback);
+                                // The tokenCallback usually contains { ticketNumber, ... } or full response
+                                setShowPaymentForm(false);
+
+                                // Record the payment in Firestore
+                                // We trust the backend has already charged the card via processKushkiCharge
+                                // Now we just need to record it locally as a 'stripe' (or 'card') payment
+                                // so the session updates.
+
+                                // so the session updates.
+
+                                await processPaymentWithAmount(amountToPay, tipAmount, 'kushki');
+                                // Wait, handlePay already calls processPaymentWithAmount. 
+                                // But handlePay was prevented to run if we showed the form.
+                                // NOTE: handlePay logic below needs adjustment to NOT call processPaymentWithAmount directly for guests.
+                            }}
+                            onError={(err) => {
+                                console.error('❌ [PaymentInterface] Kushki Error:', err);
+                                Alert.alert('Error', 'No se pudo procesar el pago. Intenta de nuevo.');
+                            }}
+                        />
+                    </View>
+                </View>
+            )}
         </ScrollView>
     );
 }
@@ -1367,5 +1416,37 @@ const styles = StyleSheet.create({
     },
     creatorTextGuest: {
         color: '#757575',
+    },
+    paymentModalOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+        zIndex: 1000,
+    },
+    paymentModalContent: {
+        backgroundColor: '#FAFAFA',
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        height: '90%', // Almost full screen
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 10,
+        elevation: 10,
+    },
+    closeModalBtn: {
+        alignSelf: 'flex-end',
+        padding: 10,
+        marginBottom: 10,
+    },
+    closeModalText: {
+        fontSize: 24,
+        color: '#888',
+        fontWeight: 'bold',
     },
 });

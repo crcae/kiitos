@@ -362,7 +362,7 @@ export interface StaffMember {
 // PAYMENTS
 // ============================================
 
-export type PaymentMethod = 'cash' | 'stripe' | 'other';
+export type PaymentMethod = 'cash' | 'stripe' | 'kushki' | 'other';
 
 export interface PaymentItem {
     item_id: string;

@@ -219,7 +219,7 @@ export const recordItemPayment = async (
     restaurantId: string,
     sessionId: string,
     items: Array<{ item_id: string; quantity: number; price: number }>,
-    method: 'cash' | 'card' | 'stripe' | 'other',
+    method: 'cash' | 'card' | 'stripe' | 'kushki' | 'other',
     createdBy: string,
     tip: number = 0
 ): Promise<void> => {

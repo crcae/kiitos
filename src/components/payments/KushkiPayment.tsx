@@ -14,6 +14,7 @@ interface KushkiPaymentProps {
     amount?: number;
     currency?: string;
     publicMerchantId?: string;
+    hideSuccessView?: boolean;
 }
 
 type PaymentInternalStatus = 'idle' | 'success' | 'error';
@@ -24,6 +25,7 @@ export const KushkiPayment: React.FC<KushkiPaymentProps> = ({
     amount,
     currency = 'MXN',
     publicMerchantId = process.env.EXPO_PUBLIC_KUSHKI_PUBLIC_MERCHANT_ID,
+    hideSuccessView = false,
 }) => {
     const { kushki, isLoading: isKushkiLoading, error: kushkiError } = useKushki(publicMerchantId);
 
@@ -260,7 +262,7 @@ export const KushkiPayment: React.FC<KushkiPaymentProps> = ({
         );
     }
 
-    if (paymentStatus === 'success') {
+    if (paymentStatus === 'success' && !hideSuccessView) {
         return (
             <View style={styles.statusContainer}>
                 <Ionicons name="checkmark-circle" size={80} color="#10B981" />
