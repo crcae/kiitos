@@ -12,7 +12,7 @@ import {
     ScrollView,
     Modal
 } from 'react-native';
-import { CountryPicker } from 'react-native-country-codes-picker';
+import { SafeCountryPicker } from './SafeCountryPicker';
 import { Smartphone, User, ChevronDown, X } from 'lucide-react-native';
 import { WebView } from 'react-native-webview';
 import { auth, db, firebaseConfig } from '../../services/firebaseConfig';
@@ -25,9 +25,13 @@ interface CustomerPhoneAuthProps {
     onSuccess?: () => void;
     title?: string;
     subtitle?: string;
+    compact?: boolean; // If true, removes ScrollView wrapper for embedding in modals
+    active?: boolean; // If false, the component should not render or execute logic
 }
 
-export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: CustomerPhoneAuthProps) {
+export default function CustomerPhoneAuth({ onSuccess, title, subtitle, compact = false, active = true }: CustomerPhoneAuthProps) {
+    if (!active) return null;
+
     const { refreshUser } = useAuth();
 
     const [countryCode, setCountryCode] = useState('+52');
@@ -277,6 +281,144 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
         </html>
     `;
 
+    // Compact mode: Render without wrapper containers for modal embedding
+    if (compact) {
+        return (
+            <>
+                {step === 'phone' && (
+                    <>
+                        <View style={styles.phoneInputContainer}>
+                            <TouchableOpacity
+                                style={styles.countryPickerButton}
+                                onPress={() => setShowCountryPicker(true)}
+                            >
+                                <Text style={styles.flagText}>{countryFlag}</Text>
+                                <Text style={styles.callingCode}>{countryCode}</Text>
+                                <ChevronDown size={16} color="#6B7280" style={{ marginLeft: 4 }} />
+                            </TouchableOpacity>
+
+                            <TextInput
+                                style={styles.phoneInput}
+                                placeholder="55 1234 5678"
+                                placeholderTextColor="#9CA3AF"
+                                keyboardType="phone-pad"
+                                value={phone}
+                                onChangeText={setPhone}
+                                autoFocus
+                            />
+                        </View>
+                        <TouchableOpacity style={styles.primaryBtn} onPress={handleSendCode} disabled={loading}>
+                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Enviar Código</Text>}
+                        </TouchableOpacity>
+                    </>
+                )}
+
+                {step === 'otp' && (
+                    <>
+                        <TextInput
+                            style={styles.otpInput}
+                            placeholder="Código de 6 dígitos"
+                            placeholderTextColor="#9CA3AF"
+                            keyboardType="number-pad"
+                            maxLength={6}
+                            value={code}
+                            onChangeText={setCode}
+                            autoFocus
+                        />
+                        <TouchableOpacity style={styles.primaryBtn} onPress={handleVerifyCode} disabled={loading}>
+                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Verificar</Text>}
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.resendBtn} onPress={() => setStep('phone')}>
+                            <Text style={styles.resendText}>Cambiar número</Text>
+                        </TouchableOpacity>
+                    </>
+                )}
+
+                {step === 'name' && (
+                    <>
+                        <TextInput
+                            style={styles.nameInput}
+                            placeholder="Tu Nombre Completo"
+                            placeholderTextColor="#9CA3AF"
+                            value={name}
+                            onChangeText={setName}
+                            autoFocus
+                        />
+                        <TouchableOpacity style={styles.primaryBtn} onPress={handleCompleteRegistration} disabled={loading}>
+                            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Completar Perfil</Text>}
+                        </TouchableOpacity>
+                    </>
+                )}
+
+                {Platform.OS === 'web' && (
+                    <View style={styles.recaptchaContainer}>
+                        <View id="customer-recaptcha-container" />
+                    </View>
+                )}
+
+                {/* Dynamic Country Picker - Isolated rendering */}
+                {active && step === 'phone' && showCountryPicker && (
+                    <SafeCountryPicker
+                        show={true}
+                        pickerButtonOnPress={(item) => {
+                            setCountryCode(item.dial_code);
+                            setCountryFlag(item.flag);
+                            setShowCountryPicker(false);
+                        }}
+                        onBackdropPress={() => setShowCountryPicker(false)}
+                        style={{
+                            modal: {
+                                height: 500,
+                            },
+                        }}
+                        lang={'es'}
+                    />
+                )}
+
+                {/* Native reCAPTCHA Modal (WebView) - Isolated rendering */}
+                {active && showRecaptcha && Platform.OS !== 'web' && (
+                    <Modal visible={true} transparent={true} animationType="slide" onRequestClose={() => {
+                        setShowRecaptcha(false);
+                        setLoading(false);
+                    }}>
+                        <View style={styles.recaptchaModalContainer}>
+                            <View style={styles.recaptchaHeader}>
+                                <Text style={styles.recaptchaTitle}>Verificación de seguridad</Text>
+                                <TouchableOpacity onPress={() => {
+                                    setShowRecaptcha(false);
+                                    setLoading(false);
+                                }}>
+                                    <X size={24} color="#000" />
+                                </TouchableOpacity>
+                            </View>
+                            <WebView
+                                originWhitelist={['*']}
+                                source={{ html: recaptchaHtml, baseUrl: 'https://kiitos-app.firebaseapp.com' }}
+                                onMessage={handleNativeRecaptchaMessage}
+                                javaScriptEnabled={true}
+                                domStorageEnabled={true}
+                                injectedJavaScript={`
+                                    setTimeout(function() {
+                                        if (window.verifyAndSend) {
+                                            window.verifyAndSend('${countryCode}${phone.replace(/\s/g, '')}');
+                                        } else {
+                                            window.ReactNativeWebView.postMessage(JSON.stringify({type: 'error', value: 'Function not loaded'}));
+                                        }
+                                    }, 1000);
+                                    true;
+                                `}
+                                style={{ flex: 1 }}
+                            />
+                        </View>
+                    </Modal>
+                )}
+            </>
+        );
+    }
+
+    if (!active) return null;
+
+    // Full mode: Render with ScrollView wrapper for standalone pages
     return (
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
@@ -375,24 +517,26 @@ export default function CustomerPhoneAuth({ onSuccess, title, subtitle }: Custom
                     </View>
                 )}
 
-                <CountryPicker
-                    show={showCountryPicker}
-                    pickerButtonOnPress={(item) => {
-                        setCountryCode(item.dial_code);
-                        setCountryFlag(item.flag);
-                        setShowCountryPicker(false);
-                    }}
-                    onBackdropPress={() => setShowCountryPicker(false)}
-                    style={{
-                        modal: {
-                            height: 500,
-                        },
-                    }}
-                    lang={'es'}
-                />
+                {active && step === 'phone' && showCountryPicker && (
+                    <SafeCountryPicker
+                        show={true}
+                        pickerButtonOnPress={(item) => {
+                            setCountryCode(item.dial_code);
+                            setCountryFlag(item.flag);
+                            setShowCountryPicker(false);
+                        }}
+                        onBackdropPress={() => setShowCountryPicker(false)}
+                        style={{
+                            modal: {
+                                height: 500,
+                            },
+                        }}
+                        lang={'es'}
+                    />
+                )}
 
                 {/* Native reCAPTCHA Modal (WebView) */}
-                {showRecaptcha && Platform.OS !== 'web' && (
+                {active && showRecaptcha && Platform.OS !== 'web' && (
                     <Modal visible={true} transparent={true} animationType="slide" onRequestClose={() => {
                         setShowRecaptcha(false);
                         setLoading(false);
