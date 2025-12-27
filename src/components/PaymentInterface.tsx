@@ -276,10 +276,11 @@ export default function PaymentInterface({
 
                 const selectedItems = Array.from(itemCounts.entries()).map(([itemId, quantity]) => {
                     const item = session.items.find(i => i.id === itemId)!;
+                    const modifiersTotal = item.modifiers?.reduce((sum, mod) => sum + mod.price, 0) || 0;
                     return {
                         item_id: itemId,
                         quantity,
-                        price: item.price
+                        price: item.price + modifiersTotal
                     };
                 });
 
